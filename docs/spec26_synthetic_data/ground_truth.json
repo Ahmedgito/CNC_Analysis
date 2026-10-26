@@ -1,0 +1,17 @@
+{
+  "_note": "Synthetic test data. Use these true dimensions to model matching IGES files in FreeCAD. Bounding boxes in mm.",
+  "2280": {"name": "Flange", "material": "SS304", "units_in_pdf": "mm", "bbox_mm": [120, 120, 20],
+           "features": "centre bore D40, 6 x D10 holes on D90 PCD", "files": ["excel A", "pdf", "iges (you model)"], "planted_issue": "none"},
+  "2281": {"name": "Stepped Shaft", "material": "EN8", "units_in_pdf": "mm", "bbox_mm": [30, 30, 200],
+           "features": "D30 x 160 long + D25 x 40 long step", "files": ["excel A", "pdf", "iges (you model)"],
+           "planted_issue": "none; PDF uses different title-block labels/position (MATL, DWG NO, UNIT)"},
+  "2282": {"name": "Mounting Bracket", "material": "Aluminum 6061-T6", "units_in_pdf": "inch", "bbox_mm": [101.6, 63.5, 9.525],
+           "features": "4 x D0.250in (6.35mm) holes, 0.5in from edges", "files": ["excel A", "pdf", "iges (you model)"],
+           "planted_issue": "unit test: PDF is in inches, Excel is in mm (values agree after conversion; should NOT be flagged)"},
+  "2283": {"name": "Bushing", "material_per_pdf": "Bronze C93200", "material_per_excel": "C36000 Brass",
+           "units_in_pdf": "mm", "bbox_mm_per_pdf": [48, 48, 40], "excel_finished_size": "D50 x 40",
+           "files": ["excel B", "pdf", "iges (you model from PDF dims: D48 x 40, bore D30)"],
+           "planted_issue": "MISMATCH: OD 50 (Excel) vs 48 (PDF/IGES); material Brass C360 (Excel) vs Bronze C932 (PDF)"},
+  "2284": {"name": "Cover Plate", "material": "Al 5052-H32", "bbox_mm": [150, 100, 8],
+           "files": ["excel B only"], "planted_issue": "MISSING FILES: no PDF and no IGES; app must say not available"}
+}
