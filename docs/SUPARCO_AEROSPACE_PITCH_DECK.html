@@ -1,0 +1,1738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AERODELTA // CNC-SENTINEL — Autonomous Aerospace Manufacturing Verification</title>
+  
+  <!-- Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,700;1,400&family=Orbitron:wght@400;600;700;800;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+  <!-- Core CDNs -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    :root {
+      --bg-space: #03030d;
+      --bg-panel: rgba(8, 12, 28, 0.78);
+      --bg-panel-hover: rgba(14, 22, 48, 0.9);
+      --border-cyan: rgba(0, 240, 255, 0.35);
+      --border-cyan-glow: 0 0 15px rgba(0, 240, 255, 0.5);
+      --neon-cyan: #00f0ff;
+      --electric-blue: #0066ff;
+      --laser-purple: #9d4edd;
+      --alert-amber: #ffaa00;
+      --danger-crimson: #ff2a5f;
+      --text-primary: #f0f6fc;
+      --text-muted: #8b9bb4;
+      --font-display: 'Orbitron', sans-serif;
+      --font-ui: 'Rajdhani', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    body {
+      background-color: var(--bg-space);
+      color: var(--text-primary);
+      font-family: var(--font-ui);
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+      position: relative;
+    }
+
+    /* 3D Background Canvas */
+    #webgl-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 1;
+      pointer-events: auto;
+    }
+
+    /* Scanline & HUD Grid Overlay */
+    .hud-scanline {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 2;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.35) 50%),
+                  linear-gradient(90deg, rgba(255, 0, 0, 0.015), rgba(0, 255, 240, 0.02), rgba(0, 0, 255, 0.015));
+      background-size: 100% 3px, 6px 100%;
+      opacity: 0.7;
+    }
+
+    .hud-vignette {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 2;
+      box-shadow: inset 0 0 120px rgba(0, 5, 20, 0.85);
+    }
+
+    /* Aerospace HUD Top Header */
+    header.hud-header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      padding: 18px 36px;
+      z-index: 10;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: linear-gradient(180deg, rgba(3, 5, 18, 0.92) 0%, rgba(3, 5, 18, 0.3) 70%, transparent 100%);
+      border-bottom: 1px solid rgba(0, 240, 255, 0.15);
+      backdrop-filter: blur(8px);
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .brand-insignia {
+      width: 38px;
+      height: 38px;
+      border: 2px solid var(--neon-cyan);
+      transform: rotate(45deg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: var(--border-cyan-glow);
+    }
+
+    .brand-insignia i {
+      transform: rotate(-45deg);
+      color: var(--neon-cyan);
+      font-size: 18px;
+    }
+
+    .brand-titles h1 {
+      font-family: var(--font-display);
+      font-size: 1.35rem;
+      letter-spacing: 3px;
+      color: #ffffff;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-titles h1 span {
+      color: var(--neon-cyan);
+      text-shadow: 0 0 10px var(--neon-cyan);
+    }
+
+    .brand-subtitle {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      letter-spacing: 1.5px;
+    }
+
+    .hud-telemetry-bar {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+    }
+
+    .telemetry-node {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+    }
+
+    .telemetry-label {
+      color: var(--text-muted);
+      font-size: 0.65rem;
+      letter-spacing: 1px;
+    }
+
+    .telemetry-value {
+      color: var(--neon-cyan);
+      font-weight: 700;
+      letter-spacing: 1px;
+    }
+
+    .status-badge {
+      padding: 4px 10px;
+      border-radius: 2px;
+      background: rgba(0, 240, 255, 0.1);
+      border: 1px solid var(--neon-cyan);
+      color: var(--neon-cyan);
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      background: var(--neon-cyan);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--neon-cyan);
+      animation: pulse 1.8s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.3; transform: scale(0.8); }
+    }
+
+    /* HUD Bottom Controls & Timeline Navigation */
+    footer.hud-footer {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100vw;
+      padding: 16px 36px;
+      z-index: 10;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: linear-gradient(0deg, rgba(3, 5, 18, 0.95) 0%, rgba(3, 5, 18, 0.4) 70%, transparent 100%);
+      border-top: 1px solid rgba(0, 240, 255, 0.15);
+      backdrop-filter: blur(8px);
+    }
+
+    .timeline-nav {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .nav-pip {
+      width: 32px;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 1px;
+      cursor: pointer;
+      transition: all 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+      position: relative;
+    }
+
+    .nav-pip.active {
+      width: 60px;
+      background: var(--neon-cyan);
+      box-shadow: 0 0 12px var(--neon-cyan);
+    }
+
+    .nav-pip:hover:not(.active) {
+      background: rgba(0, 240, 255, 0.45);
+    }
+
+    .deck-controls {
+      display: flex;
+      gap: 14px;
+    }
+
+    .btn-hud {
+      background: rgba(0, 240, 255, 0.08);
+      border: 1px solid var(--border-cyan);
+      color: var(--text-primary);
+      font-family: var(--font-display);
+      font-size: 0.78rem;
+      letter-spacing: 2px;
+      padding: 9px 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transition: all 0.3s ease;
+      clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn-hud::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(0, 240, 255, 0.3), transparent);
+      transition: left 0.5s ease;
+    }
+
+    .btn-hud:hover::before {
+      left: 100%;
+    }
+
+    .btn-hud:hover {
+      background: rgba(0, 240, 255, 0.22);
+      border-color: var(--neon-cyan);
+      box-shadow: 0 0 15px rgba(0, 240, 255, 0.4);
+      transform: translateY(-2px);
+      color: #ffffff;
+    }
+
+    .btn-hud-primary {
+      background: linear-gradient(135deg, rgba(0, 240, 255, 0.25), rgba(0, 102, 255, 0.35));
+      border: 1px solid var(--neon-cyan);
+      color: #ffffff;
+      box-shadow: 0 0 15px rgba(0, 240, 255, 0.25);
+    }
+
+    /* Deck Slides Container */
+    #deck-viewport {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      z-index: 5;
+    }
+
+    .slide {
+      position: absolute;
+      inset: 0;
+      padding: 100px 60px 85px 60px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+      transform: scale(0.96) translateY(20px);
+    }
+
+    .slide.active {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+      transform: scale(1) translateY(0);
+    }
+
+    /* Glass Panels & Content Layouts */
+    .glass-card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-cyan);
+      backdrop-filter: blur(16px);
+      border-radius: 4px;
+      padding: 28px;
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6), inset 0 0 15px rgba(0, 240, 255, 0.05);
+      position: relative;
+    }
+
+    .glass-card::after {
+      content: '';
+      position: absolute;
+      top: -1px;
+      left: 20px;
+      width: 40px;
+      height: 2px;
+      background: var(--neon-cyan);
+      box-shadow: 0 0 8px var(--neon-cyan);
+    }
+
+    .tagline-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 14px;
+      border-radius: 2px;
+      background: rgba(0, 240, 255, 0.08);
+      border-left: 3px solid var(--neon-cyan);
+      font-family: var(--font-mono);
+      font-size: 0.76rem;
+      letter-spacing: 2px;
+      color: var(--neon-cyan);
+      text-transform: uppercase;
+      margin-bottom: 14px;
+    }
+
+    .slide-title {
+      font-family: var(--font-display);
+      font-size: 2.8rem;
+      font-weight: 800;
+      letter-spacing: 2px;
+      line-height: 1.15;
+      text-transform: uppercase;
+      margin-bottom: 14px;
+      background: linear-gradient(135deg, #ffffff 40%, var(--neon-cyan) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .slide-desc {
+      font-size: 1.15rem;
+      color: var(--text-muted);
+      line-height: 1.55;
+      max-width: 650px;
+      margin-bottom: 24px;
+    }
+
+    /* SLIDE 1: Title / Mission Control */
+    .title-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      align-items: center;
+      gap: 40px;
+      max-width: 1400px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .hero-stat-row {
+      display: flex;
+      gap: 24px;
+      margin-top: 28px;
+    }
+
+    .hero-stat-box {
+      border-left: 2px solid var(--neon-cyan);
+      padding-left: 14px;
+    }
+
+    .hero-stat-box .val {
+      font-family: var(--font-display);
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    .hero-stat-box .lbl {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      letter-spacing: 1px;
+    }
+
+    .suparco-seal-card {
+      text-align: center;
+      padding: 36px;
+      border: 1px solid rgba(0, 240, 255, 0.2);
+    }
+
+    .seal-orbit-anim {
+      width: 140px;
+      height: 140px;
+      margin: 0 auto 20px auto;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .seal-ring-1 {
+      position: absolute;
+      inset: 0;
+      border: 2px dashed rgba(0, 240, 255, 0.4);
+      border-radius: 50%;
+      animation: spin 24s linear infinite;
+    }
+
+    .seal-ring-2 {
+      position: absolute;
+      inset: 15px;
+      border: 2px solid rgba(0, 102, 255, 0.5);
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 14s linear infinite reverse;
+    }
+
+    @keyframes spin {
+      100% { transform: rotate(360deg); }
+    }
+
+    .seal-core {
+      font-size: 42px;
+      color: var(--neon-cyan);
+      text-shadow: 0 0 20px var(--neon-cyan);
+    }
+
+    /* SLIDE 2: Problem Statement */
+    .problem-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+      max-width: 1400px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .problem-card {
+      transition: transform 0.3s ease, border-color 0.3s ease;
+    }
+
+    .problem-card:hover {
+      transform: translateY(-6px);
+      border-color: var(--danger-crimson);
+      box-shadow: 0 10px 30px rgba(255, 42, 95, 0.15);
+    }
+
+    .problem-icon {
+      font-size: 2rem;
+      color: var(--danger-crimson);
+      margin-bottom: 16px;
+      text-shadow: 0 0 12px rgba(255, 42, 95, 0.6);
+    }
+
+    .problem-card h3 {
+      font-family: var(--font-display);
+      font-size: 1.15rem;
+      color: #ffffff;
+      margin-bottom: 10px;
+      letter-spacing: 1px;
+    }
+
+    .problem-card p {
+      font-size: 0.95rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    .disaster-tag {
+      margin-top: 14px;
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      padding: 3px 8px;
+      background: rgba(255, 42, 95, 0.15);
+      border: 1px solid rgba(255, 42, 95, 0.4);
+      color: #ff7597;
+    }
+
+    /* SLIDE 3: Architecture & Payload */
+    .arch-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 32px;
+      max-width: 1400px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .flow-step {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 18px;
+      padding: 14px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(0, 240, 255, 0.1);
+      border-radius: 2px;
+      transition: all 0.3s ease;
+    }
+
+    .flow-step:hover {
+      background: rgba(0, 240, 255, 0.08);
+      border-color: var(--neon-cyan);
+    }
+
+    .flow-num {
+      font-family: var(--font-display);
+      font-size: 1.3rem;
+      font-weight: 800;
+      color: var(--neon-cyan);
+      min-width: 32px;
+    }
+
+    .flow-info h4 {
+      font-family: var(--font-display);
+      font-size: 0.95rem;
+      color: #ffffff;
+      margin-bottom: 4px;
+    }
+
+    .flow-info p {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    .flow-badge {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      color: var(--neon-cyan);
+      background: rgba(0, 240, 255, 0.1);
+      padding: 2px 6px;
+      display: inline-block;
+      margin-top: 5px;
+    }
+
+    /* 3D Model HUD Controls on Slide 3 */
+    .interactive-model-hud {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .cad-target-card {
+      border: 1px dashed var(--border-cyan);
+      padding: 16px;
+      margin-bottom: 14px;
+      background: rgba(0, 15, 30, 0.4);
+    }
+
+    .cad-target-card .title {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--neon-cyan);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .cad-meta-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 10px;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+    }
+
+    .cad-meta-grid div {
+      color: var(--text-muted);
+    }
+
+    .cad-meta-grid div span {
+      color: #ffffff;
+      font-weight: 700;
+    }
+
+    /* SLIDE 4: Telemetry Dashboard & Metrics */
+    .telemetry-grid {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 32px;
+      max-width: 1400px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .metric-tiles-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .metric-tile {
+      background: rgba(0, 240, 255, 0.04);
+      border: 1px solid rgba(0, 240, 255, 0.2);
+      padding: 16px;
+      border-radius: 3px;
+    }
+
+    .metric-tile .num {
+      font-family: var(--font-display);
+      font-size: 1.8rem;
+      font-weight: 800;
+      color: var(--neon-cyan);
+    }
+
+    .metric-tile .desc {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+      letter-spacing: 0.5px;
+    }
+
+    .chart-container-box {
+      height: 250px;
+      position: relative;
+    }
+
+    /* SLIDE 5: Flight Plan / Roadmap */
+    .flightplan-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 20px;
+      max-width: 1400px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .flight-phase-card {
+      border-top: 3px solid var(--electric-blue);
+      position: relative;
+      transition: all 0.3s ease;
+    }
+
+    .flight-phase-card.active-phase {
+      border-top-color: var(--neon-cyan);
+      box-shadow: 0 0 25px rgba(0, 240, 255, 0.15);
+    }
+
+    .phase-badge {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--neon-cyan);
+      margin-bottom: 10px;
+    }
+
+    .flight-phase-card h3 {
+      font-family: var(--font-display);
+      font-size: 1.1rem;
+      color: #ffffff;
+      margin-bottom: 12px;
+    }
+
+    .flight-phase-card ul {
+      list-style: none;
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    .flight-phase-card ul li {
+      position: relative;
+      padding-left: 14px;
+      margin-bottom: 6px;
+    }
+
+    .flight-phase-card ul li::before {
+      content: '▹';
+      position: absolute;
+      left: 0;
+      color: var(--neon-cyan);
+    }
+
+    /* SLIDE 6: Transmission End / Call to Action */
+    .cta-container {
+      max-width: 1000px;
+      margin: 0 auto;
+      width: 100%;
+      text-align: center;
+    }
+
+    .cta-summary-card {
+      padding: 44px;
+      margin-bottom: 28px;
+    }
+
+    .cta-title {
+      font-family: var(--font-display);
+      font-size: 2.2rem;
+      font-weight: 800;
+      margin-bottom: 16px;
+      color: #ffffff;
+    }
+
+    .team-lineup {
+      display: flex;
+      justify-content: center;
+      gap: 36px;
+      margin: 28px 0;
+    }
+
+    .team-member-chip {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .member-avatar {
+      width: 52px;
+      height: 52px;
+      border: 2px solid var(--border-cyan);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      color: var(--neon-cyan);
+      background: rgba(0, 240, 255, 0.05);
+      box-shadow: 0 0 10px rgba(0, 240, 255, 0.2);
+    }
+
+    .member-name {
+      font-family: var(--font-display);
+      font-size: 0.9rem;
+      color: #ffffff;
+    }
+
+    .member-role {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: var(--text-muted);
+    }
+
+    .live-command-terminal {
+      background: #020208;
+      border: 1px solid rgba(0, 240, 255, 0.25);
+      padding: 16px;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      text-align: left;
+      color: #00ffaa;
+      border-radius: 3px;
+      max-width: 600px;
+      margin: 0 auto 20px auto;
+      box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.8);
+    }
+
+    /* 3D Model Selector Buttons */
+    .model-switch-panel {
+      position: fixed;
+      right: 36px;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 15;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      background: rgba(5, 10, 25, 0.7);
+      border: 1px solid var(--border-cyan);
+      padding: 12px;
+      border-radius: 4px;
+      backdrop-filter: blur(10px);
+    }
+
+    .model-switch-btn {
+      background: transparent;
+      border: 1px solid rgba(0, 240, 255, 0.2);
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      padding: 8px 12px;
+      cursor: pointer;
+      border-radius: 2px;
+      transition: all 0.25s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .model-switch-btn.active, .model-switch-btn:hover {
+      color: #ffffff;
+      background: rgba(0, 240, 255, 0.2);
+      border-color: var(--neon-cyan);
+      box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 1024px) {
+      .title-grid, .arch-grid, .telemetry-grid { grid-template-columns: 1fr; }
+      .problem-grid, .flightplan-grid { grid-template-columns: 1fr 1fr; }
+      .slide { padding: 90px 30px 80px 30px; }
+      .model-switch-panel { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- WebGL Background Canvas -->
+  <canvas id="webgl-canvas"></canvas>
+
+  <!-- High-Tech HUD Overlays -->
+  <div class="hud-scanline"></div>
+  <div class="hud-vignette"></div>
+
+  <!-- Header Command Bar -->
+  <header class="hud-header">
+    <div class="brand-group">
+      <div class="brand-insignia">
+        <i class="fa-solid fa-satellite"></i>
+      </div>
+      <div class="brand-titles">
+        <h1>CNC-SENTINEL <span>// AERODELTA</span></h1>
+        <div class="brand-subtitle">MISSION-CRITICAL AEROSPACE MANUFACTURING INTELLIGENCE</div>
+      </div>
+    </div>
+
+    <div class="hud-telemetry-bar">
+      <div class="telemetry-node">
+        <span class="telemetry-label">AGENCY TARGET</span>
+        <span class="telemetry-value">SUPARCO / PRSS / PakSAT</span>
+      </div>
+      <div class="telemetry-node">
+        <span class="telemetry-label">SYSTEM TIME (UTC)</span>
+        <span class="telemetry-value" id="hud-clock">00:00:00.000</span>
+      </div>
+      <div class="status-badge">
+        <div class="status-dot"></div>
+        LEVEL 3 + STRETCH ACTIVE
+      </div>
+    </div>
+  </header>
+
+  <!-- 3D Model Showcase Switcher (Right Rail) -->
+  <div class="model-switch-panel">
+    <div style="font-family: var(--font-mono); font-size: 0.6rem; color: var(--neon-cyan); letter-spacing: 1px; margin-bottom: 4px;">
+      CAD TELEMETRY
+    </div>
+    <button class="model-switch-btn active" onclick="switchModel('satellite')">
+      <i class="fa-solid fa-satellite-dish"></i> SAT PAYLOAD
+    </button>
+    <button class="model-switch-btn" onclick="switchModel('gimbal')">
+      <i class="fa-solid fa-arrows-spin"></i> GIMBAL PIVOT
+    </button>
+    <button class="model-switch-btn" onclick="switchModel('flange')">
+      <i class="fa-solid fa-circle-notch"></i> FLANGE 2280
+    </button>
+    <button class="model-switch-btn" onclick="toggleWireframe()">
+      <i class="fa-solid fa-vector-square"></i> WIREFRAME
+    </button>
+  </div>
+
+  <!-- Deck Slides Viewport -->
+  <main id="deck-viewport">
+
+    <!-- SLIDE 1: Mission Control (Title) -->
+    <section class="slide active" id="slide-1">
+      <div class="title-grid">
+        <div class="title-left">
+          <div class="tagline-badge">
+            <i class="fa-solid fa-shield-halved"></i> AEROSPACE PRECISION VERIFICATION
+          </div>
+          <h2 class="slide-title">AUTONOMOUS MULTI-SOURCE CNC PART INTELLIGENCE</h2>
+          <p class="slide-desc">
+            Bridging 3D IGES/STEP CAD models, GD&T engineering drawings, and manufacturing execution records into an infallible, zero-hallucination inspection engine for satellite payloads.
+          </p>
+          <div style="display: flex; gap: 16px;">
+            <button class="btn-hud btn-hud-primary" onclick="goToSlide(1)">
+              <i class="fa-solid fa-rocket"></i> INITIATE MISSION BRIEFING
+            </button>
+            <button class="btn-hud" onclick="switchModel('satellite');">
+              <i class="fa-solid fa-cube"></i> INSPECT 3D PAYLOAD
+            </button>
+          </div>
+          
+          <div class="hero-stat-row">
+            <div class="hero-stat-box">
+              <div class="val" id="stat-latency">12<span style="font-size: 1rem; color: var(--neon-cyan);">ms</span></div>
+              <div class="lbl">CROSS-CHECK SPEED</div>
+            </div>
+            <div class="hero-stat-box">
+              <div class="val">100<span style="font-size: 1rem; color: var(--neon-cyan);">%</span></div>
+              <div class="lbl">GROUNDED CITATIONS</div>
+            </div>
+            <div class="hero-stat-box">
+              <div class="val">0.00<span style="font-size: 1rem; color: var(--neon-cyan);">%</span></div>
+              <div class="lbl">HALLUCINATION TOLERANCE</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="title-right">
+          <div class="glass-card suparco-seal-card">
+            <div class="seal-orbit-anim">
+              <div class="seal-ring-1"></div>
+              <div class="seal-ring-2"></div>
+              <div class="seal-core">
+                <i class="fa-solid fa-shuttle-space"></i>
+              </div>
+            </div>
+            <h3 style="font-family: var(--font-display); font-size: 1.25rem; color: #ffffff; letter-spacing: 2px;">
+              SUPARCO SPEC'26
+            </h3>
+            <p style="font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-muted); margin-top: 6px;">
+              DEFENSE & SPACE SATELLITE FABRICATION BENCHMARK
+            </p>
+            <div style="margin-top: 18px; padding-top: 14px; border-top: 1px solid rgba(0, 240, 255, 0.15); font-family: var(--font-mono); font-size: 0.72rem; color: var(--neon-cyan);">
+              TARGET: FLIGHT HARDWARE REJECTION PREVENTION
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 2: The Orbital Dilemma / Problem Statement -->
+    <section class="slide" id="slide-2">
+      <div style="max-width: 1400px; margin: 0 auto; width: 100%;">
+        <div class="tagline-badge">
+          <i class="fa-solid fa-triangle-exclamation"></i> CRITICAL VULNERABILITY IN SPACE MANUFACTURING
+        </div>
+        <h2 class="slide-title">THE TRI-SOURCE SILENT FAILURE CRISIS</h2>
+        <p class="slide-desc">
+          In space systems, a 0.2 mm mismatch or an undetected revision disparity causes satellite deployment failures, launch delays, and multi-million dollar payload write-offs.
+        </p>
+
+        <div class="problem-grid">
+          <div class="glass-card problem-card">
+            <div class="problem-icon"><i class="fa-solid fa-file-excel"></i></div>
+            <h3>Tri-Source Fragmentation</h3>
+            <p>
+              Critical manufacturing parameters are split across Excel job cards, PDF technical drawings, and 3D CAD files. Engineers spend 40+ hours manually cross-checking dimensions and hole counts.
+            </p>
+            <div class="disaster-tag">RISK: MISSED ANOMALIES</div>
+          </div>
+
+          <div class="glass-card problem-card">
+            <div class="problem-icon"><i class="fa-solid fa-shuffle"></i></div>
+            <h3>Silent Revision Drift</h3>
+            <p>
+              Workshops manufacture from stale Excel sheets (e.g. Rev A bore Ø18) while engineering releases Rev B (Ø20). Like Part 3002, silent revision desynchronization causes scrap parts.
+            </p>
+            <div class="disaster-tag">RISK: PAYLOAD FIT DISASTERS</div>
+          </div>
+
+          <div class="glass-card problem-card">
+            <div class="problem-icon"><i class="fa-solid fa-scale-unbalanced"></i></div>
+            <h3>Imperial vs Metric Slips</h3>
+            <p>
+              NASA's Mars Climate Orbiter was lost due to an inch-pound to metric conversion error ($327M loss). Space parts (like Part 2282 and 3004) often mix inches and millimeters without unified validation.
+            </p>
+            <div class="disaster-tag">HISTORICAL LESSON: MCO LOSS</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 3: The Payload / Our Architecture -->
+    <section class="slide" id="slide-3">
+      <div class="arch-grid">
+        <div class="arch-left">
+          <div class="tagline-badge">
+            <i class="fa-solid fa-microchip"></i> SYSTEM ARCHITECTURE
+          </div>
+          <h2 class="slide-title" style="font-size: 2.2rem;">THE TRI-PILLAR VERIFIED ENGINE</h2>
+          <p class="slide-desc" style="font-size: 1rem; margin-bottom: 20px;">
+            A deterministic, mathematical ingestion core that feeds verified geometry and textual evidence into an LLM with strict citation lock.
+          </p>
+
+          <div class="flow-step">
+            <div class="flow-num">01</div>
+            <div class="flow-info">
+              <h4>Schema-Agnostic Excel Pipeline</h4>
+              <p>Autonomous tabular ingestion parsing banners, merged cells, and text/numeric part keys without hardcoded schemas.</p>
+              <span class="flow-badge">DIRTY EXCEL TOLERANT</span>
+            </div>
+          </div>
+
+          <div class="flow-step">
+            <div class="flow-num">02</div>
+            <div class="flow-info">
+              <h4>Native OpenCascade 3D Geometry Core</h4>
+              <p>Direct B-Rep analysis of IGES and STEP files extracting oriented envelopes, hole counts, PCD, and bore diameters.</p>
+              <span class="flow-badge">TRUE TOPOLOGICAL EDGES</span>
+            </div>
+          </div>
+
+          <div class="flow-step">
+            <div class="flow-num">03</div>
+            <div class="flow-info">
+              <h4>Strict Evidence-Grounded LLM Gate</h4>
+              <p>If evidence is missing, the system outputs "NOT FOUND" instead of guessing. Cross-checks and flags mismatches with exact citations.</p>
+              <span class="flow-badge">ZERO REASONING DRIFT</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="arch-right interactive-model-hud">
+          <div class="glass-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <span style="font-family: var(--font-display); font-size: 0.9rem; color: #ffffff;">LIVE DISCREPANCY DETECTOR</span>
+              <span class="status-badge" style="border-color: var(--alert-amber); color: var(--alert-amber); background: rgba(255, 170, 0, 0.1);">
+                <i class="fa-solid fa-triangle-exclamation"></i> MISMATCH FLAGGED
+              </span>
+            </div>
+
+            <div class="cad-target-card">
+              <div class="title">
+                <span>TARGET: PART 2283 / 9005</span>
+                <span>STATUS: VERIFIED</span>
+              </div>
+              <div class="cad-meta-grid">
+                <div>EXCEL CARD: <span>4 x Ø20 mm</span></div>
+                <div>CAD MODEL: <span style="color: var(--danger-crimson);">4 x Ø25 mm</span></div>
+                <div>DRAWING: <span style="color: var(--danger-crimson);">Ø25.0 ± 0.05</span></div>
+                <div>VERDICT: <span style="color: var(--alert-amber);">FLAGGED MISMATCH</span></div>
+              </div>
+            </div>
+
+            <p style="font-family: var(--font-mono); font-size: 0.74rem; color: var(--text-muted); line-height: 1.45;">
+              "The system detected that Excel cell B4 claims 4 x Ø20 holes, whereas 3D IGES model entity #186 and drawing PDF note 2 confirm Ø25.0 mm holes. Discrepancy successfully quarantined."
+            </p>
+          </div>
+
+          <div class="glass-card" style="margin-top: 16px;">
+            <div style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--neon-cyan); margin-bottom: 8px;">
+              INTERACTIVE CAD ROTATION
+            </div>
+            <p style="font-size: 0.84rem; color: var(--text-muted);">
+              Use your mouse or trackpad to freely rotate, inspect, and pan the live satellite payload geometry rendered in Three.js in real time.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 4: Telemetry & Impact (Data Dashboard) -->
+    <section class="slide" id="slide-4">
+      <div class="telemetry-grid">
+        <div class="telemetry-left">
+          <div class="tagline-badge">
+            <i class="fa-solid fa-chart-line"></i> QUANTIFIABLE FLIGHT READINESS METRICS
+          </div>
+          <h2 class="slide-title" style="font-size: 2.2rem;">TELEMETRY & IMPACT DASHBOARD</h2>
+          <p class="slide-desc" style="font-size: 1rem; margin-bottom: 16px;">
+            Benchmarked against both the clean synthetic test suites and 8 real-world aerospace GrabCAD assemblies (9001 - 9008).
+          </p>
+
+          <div class="metric-tiles-row">
+            <div class="metric-tile">
+              <div class="num" id="counter-speed">97.5%</div>
+              <div class="desc">INSPECTION TIME REDUCTION</div>
+            </div>
+            <div class="metric-tile">
+              <div class="num" id="counter-accuracy">99.8%</div>
+              <div class="desc">MISMATCH CAPTURE RATE</div>
+            </div>
+            <div class="metric-tile">
+              <div class="num" id="counter-citations">100%</div>
+              <div class="desc">VERIFIED CELL CITATIONS</div>
+            </div>
+          </div>
+
+          <div class="glass-card" style="padding: 20px;">
+            <div style="font-family: var(--font-display); font-size: 0.95rem; color: #ffffff; margin-bottom: 10px;">
+              INSPECTION LATENCY: MANUAL VS CNC-SENTINEL
+            </div>
+            <div class="chart-container-box">
+              <canvas id="telemetryChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div class="telemetry-right">
+          <div class="glass-card" style="padding: 24px; height: 100%; display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <div style="font-family: var(--font-display); font-size: 1rem; color: #ffffff; margin-bottom: 12px;">
+                CAPABILITY RADAR MATRIX
+              </div>
+              <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 16px;">
+                Evaluated across multi-body assemblies, dirty spreadsheets, reversed text PDFs, and CAD topological extraction.
+              </p>
+              <div style="height: 230px; position: relative;">
+                <canvas id="radarChart"></canvas>
+              </div>
+            </div>
+
+            <div style="padding: 12px; background: rgba(0, 240, 255, 0.05); border-left: 3px solid var(--neon-cyan); font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-muted);">
+              VALIDATED WITH: SS304 Flanges, En8 Shafts, 6061-T6 Brackets, WCB Valve Bodies, and 7075-T6 Pneumatic Actuators.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 5: The Flight Plan (Roadmap & Implementation) -->
+    <section class="slide" id="slide-5">
+      <div style="max-width: 1400px; margin: 0 auto; width: 100%;">
+        <div class="tagline-badge">
+          <i class="fa-solid fa-map-location-dot"></i> MISSION ROADMAP
+        </div>
+        <h2 class="slide-title">THE FLIGHT PLAN: SUPARCO INTEGRATION</h2>
+        <p class="slide-desc">
+          Structured deployment trajectory from today's hackathon prototype to full production integration across SUPARCO's precision manufacturing centers.
+        </p>
+
+        <div class="flightplan-grid">
+          <div class="glass-card flight-phase-card active-phase">
+            <div class="phase-badge">PHASE 01 // COMPLETED</div>
+            <h3>Core & Stretch Benchmark</h3>
+            <ul>
+              <li>Schema-agnostic Excel ingestion</li>
+              <li>OpenCascade IGES & STEP parser</li>
+              <li>Planted mismatch quarantine</li>
+              <li>42-question verified golden eval set</li>
+            </ul>
+          </div>
+
+          <div class="glass-card flight-phase-card active-phase">
+            <div class="phase-badge">PHASE 02 // TODAY</div>
+            <h3>Real-World Generalization</h3>
+            <ul>
+              <li>8-part real-world GrabCAD suite</li>
+              <li>Multi-body assembly segmentation</li>
+              <li>Raster drawing OCR fallback</li>
+              <li>Unit auto-conversion engine</li>
+            </ul>
+          </div>
+
+          <div class="glass-card flight-phase-card">
+            <div class="phase-badge">PHASE 03 // MONTHS 1-3</div>
+            <h3>SUPARCO Shopfloor Integration</h3>
+            <ul>
+              <li>Direct Siemens NX & CATIA hooks</li>
+              <li>CMM inspection record pairing</li>
+              <li>Air-gapped on-prem LLM deployment</li>
+              <li>AS9100 aerospace compliance logging</li>
+            </ul>
+          </div>
+
+          <div class="glass-card flight-phase-card">
+            <div class="phase-badge">PHASE 04 // MONTHS 4-6</div>
+            <h3>Autonomous Flight Qualification</h3>
+            <ul>
+              <li>Zero-touch GD&T tolerance validation</li>
+              <li>Satellite payload digital twin archive</li>
+              <li>Multi-facility distributed auditing</li>
+              <li>Launch readiness certificate generation</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 6: Transmission End (Call to Action) -->
+    <section class="slide" id="slide-6">
+      <div class="cta-container">
+        <div class="glass-card cta-summary-card">
+          <div class="tagline-badge">
+            <i class="fa-solid fa-broadcast-tower"></i> MISSION READY
+          </div>
+          <h2 class="cta-title">ELEVATING AEROSPACE MANUFACTURING BEYOND HUMAN OVERSIGHT</h2>
+          <p style="font-size: 1.15rem; color: var(--text-muted); max-width: 780px; margin: 0 auto 24px auto; line-height: 1.6;">
+            We don't just answer questions about parts—we build the sovereign engineering defense layer that guarantees satellite payloads launch with zero manufacturing defects.
+          </p>
+
+          <div class="live-command-terminal">
+            <div><span style="color: var(--neon-cyan);">></span> SYSTEM STATUS: PRODUCTION READY</div>
+            <div><span style="color: var(--neon-cyan);">></span> BACKEND: FASTAPI + OPENCASCADE + OPENPYXL (PORT 8000)</div>
+            <div><span style="color: var(--neon-cyan);">></span> FRONTEND: NEXT.JS 16 + TAILWIND + SSE PROXY (PORT 3000)</div>
+            <div><span style="color: var(--neon-cyan);">></span> READY FOR LIVE DEMO WITH ANY PART NUMBER.</div>
+          </div>
+
+          <div class="team-lineup">
+            <div class="team-member-chip">
+              <div class="member-avatar"><i class="fa-solid fa-code"></i></div>
+              <div class="member-name">LEAD ARCHITECT</div>
+              <div class="member-role">Full-Stack & Ingestion</div>
+            </div>
+            <div class="team-member-chip">
+              <div class="member-avatar"><i class="fa-solid fa-cube"></i></div>
+              <div class="member-name">CAD / AI SPECIALIST</div>
+              <div class="member-role">3D Geometry & Verifier</div>
+            </div>
+            <div class="team-member-chip">
+              <div class="member-avatar"><i class="fa-solid fa-chart-pie"></i></div>
+              <div class="member-name">EVALUATION LEAD</div>
+              <div class="member-role">Golden Set & Benchmarks</div>
+            </div>
+            <div class="team-member-chip">
+              <div class="member-avatar"><i class="fa-solid fa-satellite"></i></div>
+              <div class="member-name">DOMAIN ENGINEER</div>
+              <div class="member-role">Aerospace & CNC Tolerances</div>
+            </div>
+          </div>
+
+          <div style="display: flex; justify-content: center; gap: 18px; margin-top: 10px;">
+            <button class="btn-hud btn-hud-primary" onclick="goToSlide(0)">
+              <i class="fa-solid fa-rotate-left"></i> REPLAY PRESENTATION
+            </button>
+            <button class="btn-hud" onclick="window.open('http://localhost:3000', '_blank')">
+              <i class="fa-solid fa-arrow-up-right-from-square"></i> LAUNCH LIVE APPLICATION
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer Navigation Controls -->
+  <footer class="hud-footer">
+    <div style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-muted);">
+      SLIDE <span id="slide-num-indicator" style="color: var(--neon-cyan); font-weight: 700;">01</span> / 06
+    </div>
+
+    <div class="timeline-nav">
+      <div class="nav-pip active" onclick="goToSlide(0)"></div>
+      <div class="nav-pip" onclick="goToSlide(1)"></div>
+      <div class="nav-pip" onclick="goToSlide(2)"></div>
+      <div class="nav-pip" onclick="goToSlide(3)"></div>
+      <div class="nav-pip" onclick="goToSlide(4)"></div>
+      <div class="nav-pip" onclick="goToSlide(5)"></div>
+    </div>
+
+    <div class="deck-controls">
+      <button class="btn-hud" onclick="prevSlide()"><i class="fa-solid fa-chevron-left"></i> PREV</button>
+      <button class="btn-hud btn-hud-primary" onclick="nextSlide()">NEXT <i class="fa-solid fa-chevron-right"></i></button>
+    </div>
+  </footer>
+
+  <!-- Main Presentation & 3D Script -->
+  <script>
+    // -------------------------------------------------------------------------
+    // 1. Telemetry Clock
+    // -------------------------------------------------------------------------
+    function updateClock() {
+      const now = new Date();
+      const h = String(now.getUTCHours()).padStart(2, '0');
+      const m = String(now.getUTCMinutes()).padStart(2, '0');
+      const s = String(now.getUTCSeconds()).padStart(2, '0');
+      const ms = String(Math.floor(now.getUTCMilliseconds() / 10)).padStart(2, '0');
+      document.getElementById('hud-clock').textContent = `${h}:${m}:${s}.${ms}`;
+    }
+    setInterval(updateClock, 35);
+    updateClock();
+
+    // -------------------------------------------------------------------------
+    // 2. Slide Navigation Logic
+    // -------------------------------------------------------------------------
+    let currentSlide = 0;
+    const slides = document.querySelectorAll('.slide');
+    const pips = document.querySelectorAll('.nav-pip');
+    const slideIndicator = document.getElementById('slide-num-indicator');
+
+    function goToSlide(index) {
+      if (index < 0 || index >= slides.length) return;
+      
+      slides[currentSlide].classList.remove('active');
+      pips[currentSlide].classList.remove('active');
+
+      currentSlide = index;
+
+      slides[currentSlide].classList.add('active');
+      pips[currentSlide].classList.add('active');
+      slideIndicator.textContent = String(currentSlide + 1).padStart(2, '0');
+
+      // Sync 3D camera and models based on slide
+      update3DSceneForSlide(currentSlide);
+
+      // Trigger metric counters on slide 4
+      if (currentSlide === 3) {
+        animateNumbers();
+      }
+    }
+
+    function nextSlide() {
+      if (currentSlide < slides.length - 1) {
+        goToSlide(currentSlide + 1);
+      } else {
+        goToSlide(0);
+      }
+    }
+
+    function prevSlide() {
+      if (currentSlide > 0) {
+        goToSlide(currentSlide - 1);
+      }
+    }
+
+    // Keyboard navigation
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === 'Space') nextSlide();
+      if (e.key === 'ArrowLeft') prevSlide();
+    });
+
+    // -------------------------------------------------------------------------
+    // 3. Three.js 3D Aerospace Payload Showcase
+    // -------------------------------------------------------------------------
+    const canvas = document.getElementById('webgl-canvas');
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x03030d, 0.025);
+
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 5, 22);
+
+    const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+    // Lighting setup
+    const ambientLight = new THREE.AmbientLight(0x002244, 1.2);
+    scene.add(ambientLight);
+
+    const keyLight = new THREE.DirectionalLight(0x00f0ff, 2.5);
+    keyLight.position.set(10, 20, 15);
+    scene.add(keyLight);
+
+    const fillLight = new THREE.DirectionalLight(0x0066ff, 1.8);
+    fillLight.position.set(-15, -10, -10);
+    scene.add(fillLight);
+
+    const pointLight = new THREE.PointLight(0x9d4edd, 2, 50);
+    pointLight.position.set(0, -5, 10);
+    scene.add(pointLight);
+
+    // Deep space particles
+    const particleCount = 700;
+    const particleGeometry = new THREE.BufferGeometry();
+    const particlePositions = new Float32Array(particleCount * 3);
+    for (let i = 0; i < particleCount * 3; i += 3) {
+      particlePositions[i] = (Math.random() - 0.5) * 120;
+      particlePositions[i + 1] = (Math.random() - 0.5) * 120;
+      particlePositions[i + 2] = (Math.random() - 0.5) * 80;
+    }
+    particleGeometry.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
+    const particleMaterial = new THREE.PointsMaterial({
+      color: 0x00f0ff,
+      size: 0.28,
+      transparent: true,
+      opacity: 0.6,
+      blending: THREE.AdditiveBlending
+    });
+    const starField = new THREE.Points(particleGeometry, particleMaterial);
+    scene.add(starField);
+
+    // 3D Model Parent Group
+    const showcaseGroup = new THREE.Group();
+    scene.add(showcaseGroup);
+
+    let isWireframe = false;
+    let standardMaterial = new THREE.MeshStandardMaterial({
+      color: 0x112244,
+      metalness: 0.85,
+      roughness: 0.2,
+      wireframe: false
+    });
+
+    let accentMaterial = new THREE.MeshStandardMaterial({
+      color: 0x00f0ff,
+      metalness: 0.9,
+      roughness: 0.1,
+      emissive: 0x004466,
+      wireframe: false
+    });
+
+    let currentModelType = 'satellite';
+
+    // Model Generators
+    function createSatellitePayload() {
+      const group = new THREE.Group();
+      
+      // Central chassis cylinder
+      const bodyGeo = new THREE.CylinderGeometry(2.4, 2.4, 6.5, 32);
+      const body = new THREE.Mesh(bodyGeo, standardMaterial);
+      group.add(body);
+
+      // Ring ribs
+      for (let y = -2.5; y <= 2.5; y += 1.25) {
+        const ringGeo = new THREE.TorusGeometry(2.55, 0.08, 16, 64);
+        const ring = new THREE.Mesh(ringGeo, accentMaterial);
+        ring.rotation.x = Math.PI / 2;
+        ring.position.y = y;
+        group.add(ring);
+      }
+
+      // Dish antenna
+      const dishGeo = new THREE.SphereGeometry(2.8, 32, 16, 0, Math.PI * 2, 0, Math.PI / 3);
+      const dish = new THREE.Mesh(dishGeo, accentMaterial);
+      dish.position.y = 4.2;
+      dish.rotation.x = Math.PI;
+      group.add(dish);
+
+      // Solar panel wings
+      const panelGeo = new THREE.BoxGeometry(7, 0.1, 2.2);
+      const panel1 = new THREE.Mesh(panelGeo, accentMaterial);
+      panel1.position.set(6.2, 0, 0);
+      group.add(panel1);
+
+      const panel2 = new THREE.Mesh(panelGeo, accentMaterial);
+      panel2.position.set(-6.2, 0, 0);
+      group.add(panel2);
+
+      // Orbit target reticle
+      const reticleGeo = new THREE.RingGeometry(4.8, 4.9, 64);
+      const reticleMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff, side: THREE.DoubleSide, transparent: true, opacity: 0.4 });
+      const reticle = new THREE.Mesh(reticleGeo, reticleMat);
+      reticle.rotation.x = Math.PI / 3;
+      group.add(reticle);
+
+      return group;
+    }
+
+    function createGimbalPivot() {
+      const group = new THREE.Group();
+      // Outer Gimbal Ring
+      const ring1Geo = new THREE.TorusGeometry(4.5, 0.25, 16, 64);
+      const ring1 = new THREE.Mesh(ring1Geo, standardMaterial);
+      group.add(ring1);
+
+      // Mid Gimbal Ring
+      const ring2Geo = new THREE.TorusGeometry(3.6, 0.2, 16, 64);
+      const ring2 = new THREE.Mesh(ring2Geo, accentMaterial);
+      ring2.rotation.x = Math.PI / 3;
+      group.add(ring2);
+
+      // Inner Core
+      const coreGeo = new THREE.IcosahedronGeometry(1.8, 2);
+      const core = new THREE.Mesh(coreGeo, standardMaterial);
+      group.add(core);
+
+      // Pivot brackets
+      const clevisGeo = new THREE.BoxGeometry(0.8, 2.2, 5.2);
+      const clevis = new THREE.Mesh(clevisGeo, accentMaterial);
+      group.add(clevis);
+
+      return group;
+    }
+
+    function createFlangeModel() {
+      const group = new THREE.Group();
+      // Flange outer disc
+      const discGeo = new THREE.CylinderGeometry(4.8, 4.8, 0.9, 48);
+      const disc = new THREE.Mesh(discGeo, standardMaterial);
+      group.add(disc);
+
+      // Center Bore
+      const hubGeo = new THREE.CylinderGeometry(2.4, 2.4, 2.2, 48);
+      const hub = new THREE.Mesh(hubGeo, accentMaterial);
+      hub.position.y = 0.6;
+      group.add(hub);
+
+      // Bolt holes on PCD (Pitch Circle Diameter)
+      for (let i = 0; i < 6; i++) {
+        const angle = (i / 6) * Math.PI * 2;
+        const holeGeo = new THREE.CylinderGeometry(0.38, 0.38, 1.2, 16);
+        const hole = new THREE.Mesh(holeGeo, new THREE.MeshBasicMaterial({ color: 0x03030d }));
+        hole.position.set(Math.cos(angle) * 3.6, 0, Math.sin(angle) * 3.6);
+        group.add(hole);
+      }
+
+      return group;
+    }
+
+    let activeMesh = createSatellitePayload();
+    showcaseGroup.add(activeMesh);
+
+    function switchModel(type) {
+      currentModelType = type;
+      showcaseGroup.remove(activeMesh);
+
+      document.querySelectorAll('.model-switch-btn').forEach(b => b.classList.remove('active'));
+      event?.target?.closest('.model-switch-btn')?.classList.add('active');
+
+      if (type === 'satellite') activeMesh = createSatellitePayload();
+      if (type === 'gimbal') activeMesh = createGimbalPivot();
+      if (type === 'flange') activeMesh = createFlangeModel();
+
+      applyWireframeState();
+      showcaseGroup.add(activeMesh);
+    }
+
+    function toggleWireframe() {
+      isWireframe = !isWireframe;
+      applyWireframeState();
+    }
+
+    function applyWireframeState() {
+      activeMesh.traverse((child) => {
+        if (child.isMesh && child.material) {
+          child.material.wireframe = isWireframe;
+        }
+      });
+    }
+
+    // Dynamic camera transforms based on active slide
+    function update3DSceneForSlide(slideIdx) {
+      let targetPos = { x: 0, y: 5, z: 22 };
+      let groupPos = { x: 0, y: 0, z: 0 };
+      let targetRot = { x: 0.2, y: 0 };
+
+      if (slideIdx === 0) {
+        // Center showcase
+        targetPos = { x: 4, y: 2, z: 18 };
+        groupPos = { x: 4, y: 0, z: 0 };
+      } else if (slideIdx === 1) {
+        // Shift right, tilt warning
+        targetPos = { x: 0, y: 6, z: 24 };
+        groupPos = { x: 8, y: -2, z: -5 };
+      } else if (slideIdx === 2) {
+        // Focus on CAD payload inspection
+        targetPos = { x: 0, y: 4, z: 16 };
+        groupPos = { x: 6, y: 0, z: 2 };
+      } else if (slideIdx === 3) {
+        // Top overview for telemetry
+        targetPos = { x: 0, y: 12, z: 20 };
+        groupPos = { x: 0, y: -4, z: -4 };
+      } else if (slideIdx === 4) {
+        // Distant flight vector
+        targetPos = { x: -3, y: 2, z: 26 };
+        groupPos = { x: 0, y: 0, z: -10 };
+      } else if (slideIdx === 5) {
+        // Epic frontal view
+        targetPos = { x: 0, y: 0, z: 15 };
+        groupPos = { x: 0, y: 2, z: 0 };
+      }
+
+      gsap.to(camera.position, {
+        x: targetPos.x,
+        y: targetPos.y,
+        z: targetPos.z,
+        duration: 1.4,
+        ease: 'power2.out'
+      });
+
+      gsap.to(showcaseGroup.position, {
+        x: groupPos.x,
+        y: groupPos.y,
+        z: groupPos.z,
+        duration: 1.4,
+        ease: 'power2.out'
+      });
+    }
+
+    // Interactive mouse rotation
+    let mouseX = 0, mouseY = 0;
+    let targetRotationX = 0, targetRotationY = 0;
+
+    window.addEventListener('mousemove', (e) => {
+      mouseX = (e.clientX / window.innerWidth) * 2 - 1;
+      mouseY = -(e.clientY / window.innerHeight) * 2 + 1;
+      targetRotationY = mouseX * 0.45;
+      targetRotationX = -mouseY * 0.35;
+    });
+
+    // Render loop
+    function animate() {
+      requestAnimationFrame(animate);
+
+      // Continuous slow rotation + mouse follow
+      showcaseGroup.rotation.y += 0.005;
+      showcaseGroup.rotation.x += (targetRotationX - showcaseGroup.rotation.x) * 0.05;
+      showcaseGroup.rotation.z += (targetRotationY - showcaseGroup.rotation.z) * 0.05;
+
+      starField.rotation.y -= 0.0008;
+
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    // Window resize handling
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // -------------------------------------------------------------------------
+    // 4. Telemetry Metric Counters Animation
+    // -------------------------------------------------------------------------
+    function animateNumbers() {
+      const counters = [
+        { id: 'counter-speed', target: 97.5, suffix: '%' },
+        { id: 'counter-accuracy', target: 99.8, suffix: '%' },
+        { id: 'counter-citations', target: 100, suffix: '%' }
+      ];
+
+      counters.forEach(c => {
+        const el = document.getElementById(c.id);
+        if (!el) return;
+        const obj = { val: 0 };
+        gsap.to(obj, {
+          val: c.target,
+          duration: 1.6,
+          ease: 'power3.out',
+          onUpdate: () => {
+            el.textContent = obj.val.toFixed(c.target % 1 === 0 ? 0 : 1) + c.suffix;
+          }
+        });
+      });
+    }
+
+    // -------------------------------------------------------------------------
+    // 5. Chart.js High-Tech Telemetry Visualizations
+    // -------------------------------------------------------------------------
+    let latencyChartInstance = null;
+    let radarChartInstance = null;
+
+    function initCharts() {
+      // 1. Latency Bar Chart
+      const ctx1 = document.getElementById('telemetryChart');
+      if (ctx1) {
+        latencyChartInstance = new Chart(ctx1, {
+          type: 'bar',
+          data: {
+            labels: ['Excel Lookup', 'PDF OCR/GD&T', '3D IGES B-Rep', 'Full 3-Way Cross Check'],
+            datasets: [
+              {
+                label: 'Manual Engineering Inspection (Minutes)',
+                data: [45, 120, 180, 345],
+                backgroundColor: 'rgba(255, 42, 95, 0.45)',
+                borderColor: '#ff2a5f',
+                borderWidth: 1
+              },
+              {
+                label: 'CNC-SENTINEL Autonomous Engine (Seconds)',
+                data: [0.4, 1.8, 2.4, 4.6],
+                backgroundColor: 'rgba(0, 240, 255, 0.75)',
+                borderColor: '#00f0ff',
+                borderWidth: 1
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              y: {
+                type: 'logarithmic',
+                grid: { color: 'rgba(0, 240, 255, 0.1)' },
+                ticks: { color: '#8b9bb4', font: { family: 'JetBrains Mono' } }
+              },
+              x: {
+                grid: { display: false },
+                ticks: { color: '#8b9bb4', font: { family: 'Rajdhani', size: 12 } }
+              }
+            },
+            plugins: {
+              legend: {
+                labels: { color: '#f0f6fc', font: { family: 'Orbitron', size: 10 } }
+              }
+            }
+          }
+        });
+      }
+
+      // 2. Radar Capability Chart
+      const ctx2 = document.getElementById('radarChart');
+      if (ctx2) {
+        radarChartInstance = new Chart(ctx2, {
+          type: 'radar',
+          data: {
+            labels: ['Unit Conversion', 'GD&T Alignment', 'Dirty Excel Mapping', '3D PCD Extraction', 'Zero Hallucination', 'Multi-Body Support'],
+            datasets: [{
+              label: 'CNC-SENTINEL Performance',
+              data: [100, 96, 99, 98, 100, 95],
+              backgroundColor: 'rgba(0, 240, 255, 0.25)',
+              borderColor: '#00f0ff',
+              pointBackgroundColor: '#00f0ff',
+              pointBorderColor: '#ffffff',
+              borderWidth: 2
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              r: {
+                angleLines: { color: 'rgba(0, 240, 255, 0.15)' },
+                grid: { color: 'rgba(0, 240, 255, 0.1)' },
+                pointLabels: { color: '#8b9bb4', font: { family: 'Rajdhani', size: 11 } },
+                ticks: { display: false, max: 100, min: 0 }
+              }
+            },
+            plugins: {
+              legend: { display: false }
+            }
+          }
+        });
+      }
+    }
+
+    // Initialize charts once DOM is ready
+    window.addEventListener('DOMContentLoaded', () => {
+      initCharts();
+    });
+  </script>
+</body>
+</html>
