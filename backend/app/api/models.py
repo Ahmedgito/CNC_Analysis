@@ -14,6 +14,8 @@ from app.domain.record import PartRecord
 from app.repositories.parts import unlinked_models
 
 router = APIRouter(tags=["models"])
+# Immutable per URL; clients put the extractor version in the URL (?v=), so a rebuilt artifact
+# gets a new cache key.
 _IMMUTABLE = "public, max-age=31536000, immutable"
 
 
@@ -54,7 +56,10 @@ def model_mesh(
     return Response(
         glb,
         media_type="model/gltf-binary",
-        headers={"Cache-Control": _IMMUTABLE, "ETag": f'"{model.sha256[:16]}-m{lod}"'},
+        headers={
+            "Cache-Control": _IMMUTABLE,
+            "ETag": f'"{model.sha256[:16]}-m{lod}-v{model.extractor_version}"',
+        },
     )
 
 
@@ -86,7 +91,7 @@ def model_view(
         media_type="image/svg+xml",
         headers={
             "Cache-Control": _IMMUTABLE,
-            "ETag": f'"{model.sha256[:16]}-{view}"',
+            "ETag": f'"{model.sha256[:16]}-{view}-v{model.extractor_version}"',
             # The SVG is ours, but it is served as a document: never let it run script.
             "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'",
             "X-Content-Type-Options": "nosniff",

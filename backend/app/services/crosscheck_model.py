@@ -511,7 +511,7 @@ def _normalised(s: St) -> str | None:
     if s.count == 0:
         return "no holes"
     mm = s.mm()
-    if mm is None:
+    if not mm:  # unknown unit, or a confirm-only list of drawing numbers
         return None
     if s.count:
         return f"{s.count} × Ø{fmt(mm[0])} mm"

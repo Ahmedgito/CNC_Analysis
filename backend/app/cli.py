@@ -84,6 +84,59 @@ def _cmd_reset_drawing(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_reprocess(args: argparse.Namespace) -> int:
+    """Re-measure stored IGES models with the current extractor and rebuild their artifacts."""
+    from sqlalchemy import select
+
+    from app.config import geometry_worker
+    from app.db.models import IngestRun
+    from app.db.session import make_engine, make_session_factory, session_scope
+    from app.geometry.errors import ModelLimitError, UnreadableModelError
+    from app.ingestion.model import ingest_model_bytes
+    from app.repositories.parts import replace_model
+    from app.services.file_store import FileStore
+
+    settings = get_settings()
+    store = FileStore(settings.store_dir)
+    worker = geometry_worker(settings)
+    engine = make_engine(settings.database_url)
+    failed = 0
+    try:
+        factory = make_session_factory(engine)
+        with session_scope(factory) as session:
+            runs = list(
+                session.scalars(
+                    select(IngestRun).where(
+                        IngestRun.file_format == "iges", IngestRun.status == "active"
+                    )
+                )
+            )
+            wanted = [r for r in runs if not args.files or r.file_name in args.files]
+            jobs = [(r.file_name, r.file_sha256) for r in wanted]
+        for name, sha in jobs:
+            data = store.model_bytes(sha)
+            if data is None:
+                print(f"missing    {name:<32} (bytes not in the store; re-ingest it)")
+                failed += 1
+                continue
+            try:
+                result = ingest_model_bytes(data, name, worker)
+            except (UnreadableModelError, ModelLimitError) as exc:
+                print(f"failed     {name:<32} {exc}")
+                failed += 1
+                continue
+            store.put_model(sha, data, result.meshes, result.views, replace_artifacts=True)
+            with session_scope(factory) as session:
+                part = replace_model(session, name, result.slice)
+            print(
+                f"reprocessed {name:<31} part={part or '-'} features={len(result.slice.features)}"
+            )
+    finally:
+        engine.dispose()
+        worker.shutdown()
+    return 1 if failed else 0
+
+
 def _cmd_serve(args: argparse.Namespace) -> int:
     import uvicorn
 
@@ -128,6 +181,13 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_reset.add_argument("path", help="The PDF file that was ingested")
     p_reset.set_defaults(func=_cmd_reset_drawing)
+
+    p_reprocess = sub.add_parser(
+        "reprocess",
+        help="Re-measure stored IGES models with the current extractor (rebuilds 3D artifacts)",
+    )
+    p_reprocess.add_argument("files", nargs="*", help="Model file names (default: all)")
+    p_reprocess.set_defaults(func=_cmd_reprocess)
 
     p_serve = sub.add_parser("serve", help="Run the API server")
     p_serve.add_argument("--host", default="127.0.0.1")

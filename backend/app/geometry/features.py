@@ -732,7 +732,7 @@ def measure(shape, stem: str, header: ModelHeader, warnings: list[str]) -> Geome
                 canonical="thickness",
                 value=f"{fmt(envelope.numbers['t_mm'])} mm",
                 numbers={"thickness_mm": envelope.numbers["t_mm"]},
-                method="smallest side of the oriented bounding box",
+                method="smallest side of the envelope, measured in the part's own frame",
                 anchor=envelope.anchor,
                 axis=envelope.axis,
             )

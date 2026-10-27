@@ -30,8 +30,8 @@ class FileStore:
         return self.root / "files" / f"{sha}.pdf"
 
     @staticmethod
-    def _write(path: Path, data: bytes) -> Path:
-        if path.exists():
+    def _write(path: Path, data: bytes, replace: bool = False) -> Path:
+        if path.exists() and not replace:
             return path
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_suffix(f".{os.getpid()}.tmp")
@@ -49,15 +49,23 @@ class FileStore:
         return sha
 
     def put_model(
-        self, sha: str, data: bytes, meshes: dict[int, bytes], views: dict[str, str]
+        self,
+        sha: str,
+        data: bytes,
+        meshes: dict[int, bytes],
+        views: dict[str, str],
+        replace_artifacts: bool = False,
     ) -> None:
+        """Store a model and its artifacts. ``replace_artifacts`` rewrites meshes and views made
+        by an older extractor (``cnc reprocess``); the file bytes themselves never change."""
         self._check(sha)
         self._write(self.root / "files" / f"{sha}.igs", data)
         for lod, glb in meshes.items():
-            self._write(self.root / "meshes" / f"{sha}_{int(lod)}.glb", glb)
+            self._write(self.root / "meshes" / f"{sha}_{int(lod)}.glb", glb, replace_artifacts)
         for name, svg in views.items():
             if _VIEW_RE.match(name):
-                self._write(self.root / "views" / f"{sha}_{name}.svg", svg.encode("utf-8"))
+                svg_path = self.root / "views" / f"{sha}_{name}.svg"
+                self._write(svg_path, svg.encode("utf-8"), replace_artifacts)
 
     def model_bytes(self, sha: str) -> bytes | None:
         path = self.root / "files" / f"{self._check(sha)}.igs"

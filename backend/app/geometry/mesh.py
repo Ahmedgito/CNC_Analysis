@@ -33,7 +33,8 @@ from app.domain.model import MeshInfo
 
 MAX_TRIANGLES = {0: 300_000, 1: 30_000}
 _RELATIVE = {0: 0.0006, 1: 0.004}  # linear deflection as a share of the envelope diagonal
-_ANGULAR = {0: 0.25, 1: 0.6}
+# Angular deflection sets how many facets a curved face gets (0.25 rad ≈ 25 per turn).
+_ANGULAR = {0: 0.12, 1: 0.25}
 
 
 def _bounds(geo) -> tuple[list[float], list[float]]:

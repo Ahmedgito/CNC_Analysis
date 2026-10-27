@@ -25,7 +25,7 @@ from app.domain.model import ModelFeature, ModelSlice
 from app.geometry.errors import ModelLimitError, UnreadableModelError
 from app.geometry.header import NotIgesError, entity_count, read_header
 
-EXTRACTOR_VERSION = 1
+EXTRACTOR_VERSION = 2  # bump when measurements or artifacts change
 MAX_BYTES = 25 * 1024 * 1024
 MAX_ENTITIES = 200_000
 MAX_FACES = 20_000
