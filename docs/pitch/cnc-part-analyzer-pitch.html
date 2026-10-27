@@ -1,0 +1,758 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CNC Part Analyzer Pitch</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@400;500;600;700&display=swap">
+<style>
+/* ===========================================
+   VIEWPORT FITTING: MANDATORY BASE STYLES
+   (frontend-slides STYLE_PRESETS.md)
+   =========================================== */
+html, body { height: 100%; overflow-x: hidden; }
+html { scroll-snap-type: y mandatory; scroll-behavior: smooth; }
+/* overflow-x: hidden on both html and body makes body the scroll container, so the snap must
+   be set there too or it never applies. */
+body { scroll-snap-type: y mandatory; scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { body { scroll-behavior: auto; } }
+.slide {
+  width: 100vw; height: 100vh; height: 100dvh; overflow: hidden;
+  scroll-snap-align: start; display: flex; flex-direction: column; position: relative;
+}
+.slide-content {
+  flex: 1; display: flex; flex-direction: column; justify-content: center;
+  max-height: 100%; overflow: hidden; padding: var(--slide-padding);
+}
+:root {
+  --title-size: clamp(1.5rem, 5vw, 4rem);
+  --h2-size: clamp(1.25rem, 3.5vw, 2.5rem);
+  --h3-size: clamp(1rem, 2.5vw, 1.75rem);
+  --body-size: clamp(0.75rem, 1.5vw, 1.125rem);
+  --small-size: clamp(0.65rem, 1vw, 0.875rem);
+  --slide-padding: clamp(1rem, 4vw, 4rem);
+  --content-gap: clamp(0.5rem, 2vw, 2rem);
+  --element-gap: clamp(0.25rem, 1vw, 1rem);
+}
+.card, .container, .content-box { max-width: min(90vw, 1000px); max-height: min(80vh, 700px); }
+.feature-list, .bullet-list { gap: clamp(0.4rem, 1vh, 1rem); }
+.feature-list li, .bullet-list li { font-size: var(--body-size); line-height: 1.4; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr)); gap: clamp(0.5rem, 1.5vw, 1rem); }
+img, .image-container { max-width: 100%; max-height: min(50vh, 400px); object-fit: contain; }
+@media (max-height: 700px) {
+  :root { --slide-padding: clamp(0.75rem, 3vw, 2rem); --content-gap: clamp(0.4rem, 1.5vw, 1rem);
+    --title-size: clamp(1.25rem, 4.5vw, 2.5rem); --h2-size: clamp(1rem, 3vw, 1.75rem); }
+}
+@media (max-height: 600px) {
+  :root { --slide-padding: clamp(0.5rem, 2.5vw, 1.5rem); --content-gap: clamp(0.3rem, 1vw, 0.75rem);
+    --title-size: clamp(1.1rem, 4vw, 2rem); --body-size: clamp(0.7rem, 1.2vw, 0.95rem); }
+  .nav-dots, .keyboard-hint, .decorative { display: none; }
+}
+@media (max-height: 500px) {
+  :root { --slide-padding: clamp(0.4rem, 2vw, 1rem); --title-size: clamp(1rem, 3.5vw, 1.5rem);
+    --h2-size: clamp(0.9rem, 2.5vw, 1.25rem); --body-size: clamp(0.65rem, 1vw, 0.85rem); }
+}
+@media (max-width: 600px) {
+  :root { --title-size: clamp(1.25rem, 7vw, 2.5rem); }
+  .grid { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.2s !important; }
+  html { scroll-behavior: auto; }
+}
+
+/* ===========================================
+   THEME: BOLD SIGNAL
+   charcoal field, one hot-orange focal card, crisp white type,
+   oversized section numbers. Edit these tokens to re-theme the deck.
+   =========================================== */
+:root {
+  color-scheme: dark;
+  --bg: #17181b;          /* charcoal field */
+  --bg-2: #202227;        /* raised panel */
+  --line: #34373e;        /* hairlines */
+  --text: #f6f5f2;        /* crisp white */
+  --muted: #a6a9b1;       /* secondary text */
+  --signal: #ff5a1f;      /* hot orange: one focal element per slide */
+  --signal-ink: #170b05;  /* text on orange */
+  --ok: #3ccf91;          /* agree */
+  --bad: #ff5a1f;         /* disagree uses the signal colour */
+  --font-display: "Archivo Black", "Arial Black", Impact, sans-serif;
+  --font-body: "Space Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+  --ease: cubic-bezier(.16, 1, .3, 1);
+}
+body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font-body); font-size: var(--body-size); -webkit-font-smoothing: antialiased; }
+h1, h2, h3, p { margin: 0; }
+h1 { font-family: var(--font-display); font-size: var(--title-size); line-height: 1.02; letter-spacing: -0.01em; text-wrap: balance; }
+h2 { font-family: var(--font-display); font-size: var(--h2-size); line-height: 1.08; text-wrap: balance; }
+h3 { font-size: var(--h3-size); font-weight: 700; line-height: 1.2; }
+p { line-height: 1.5; max-width: 62ch; }
+.muted { color: var(--muted); }
+/* Opening and closing slides: the one place the type goes keynote-large. */
+.hero h1 { font-size: clamp(2.4rem, 8.5vw, 8.5rem); line-height: .95; }
+.hero .lede { font-size: var(--h3-size); max-width: 34ch; }
+.hero .tagline { font-size: var(--small-size); max-width: none; }
+/* The deck has its own progress bar; hide the browser scrollbar. */
+body { scrollbar-width: none; }
+body::-webkit-scrollbar { display: none; }
+.mono { font-family: var(--font-mono); }
+.accent { color: var(--signal); }
+
+/* Oversized section number in the corner: the preset's signature. */
+.section-no {
+  position: absolute; right: var(--slide-padding); top: calc(var(--slide-padding) * 0.6);
+  font-family: var(--font-display); font-size: clamp(3rem, 14vw, 11rem); line-height: 1;
+  color: transparent; -webkit-text-stroke: 1px var(--line); pointer-events: none; user-select: none;
+}
+.eyebrow {
+  font-family: var(--font-mono); font-size: var(--small-size); letter-spacing: .14em; text-transform: uppercase;
+  color: var(--signal); display: flex; align-items: center; gap: .6em;
+}
+.eyebrow::before { content: ""; width: 1.6em; height: 2px; background: var(--signal); }
+.stack { display: flex; flex-direction: column; gap: var(--content-gap); position: relative; z-index: 1; }
+.row { display: flex; gap: var(--content-gap); align-items: stretch; flex-wrap: wrap; }
+
+/* Focal card */
+.focal {
+  background: var(--signal); color: var(--signal-ink); padding: clamp(.9rem, 2.2vw, 2rem);
+  border-radius: 4px; max-width: min(90vw, 760px);
+}
+.focal h2, .focal h3 { color: var(--signal-ink); }
+.focal p { color: #3b1a0b; }
+.panel { background: var(--bg-2); border: 1px solid var(--line); border-radius: 4px; padding: clamp(.75rem, 1.6vw, 1.4rem); min-width: 0; }
+.panel h3 { margin-bottom: .35em; }
+.panel p, .panel li { color: var(--muted); }
+.bullet-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; }
+.bullet-list li { padding-left: 1.2em; position: relative; }
+.bullet-list li::before { content: ""; position: absolute; left: 0; top: .62em; width: .5em; height: 2px; background: var(--signal); }
+.tag { font-family: var(--font-mono); font-size: var(--small-size); padding: .15em .5em; border: 1px solid currentColor; border-radius: 3px; white-space: nowrap; }
+.src-xl { color: #4fd39a; } .src-pdf { color: #ff8a9b; } .src-ig { color: #9d97ff; }
+
+/* Feature grid: six cards max */
+.features { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(.5rem, 1.2vw, 1rem); }
+.feature { background: var(--bg-2); border: 1px solid var(--line); border-radius: 4px; padding: clamp(.7rem, 1.4vw, 1.2rem); display: flex; flex-direction: column; gap: .35em; min-width: 0; }
+.feature .k { font-family: var(--font-mono); font-size: var(--small-size); color: var(--signal); }
+.feature h3 { font-size: clamp(.9rem, 1.7vw, 1.3rem); }
+.feature p { color: var(--muted); font-size: var(--small-size); line-height: 1.45; }
+.feature.is-focal { background: var(--signal); border-color: var(--signal); }
+.feature.is-focal h3, .feature.is-focal .k { color: var(--signal-ink); }
+.feature.is-focal p { color: #3b1a0b; }
+@media (max-width: 900px) { .features { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px) { .features { grid-template-columns: 1fr; } .feature p { display: none; } }
+
+/* Three-column file reading */
+.cols3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(.5rem, 1.4vw, 1.2rem); }
+/* Stack the columns only on tall, narrow screens; a landscape phone keeps three columns. */
+@media (max-width: 760px) and (min-height: 501px) { .cols3 { grid-template-columns: 1fr; } .cols3 .bullet-list li:nth-child(n+3) { display: none; } }
+@media (max-height: 500px) { .cols3 .panel p { font-size: var(--small-size); } }
+
+/* Big numbers */
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: clamp(.5rem, 1.4vw, 1.2rem); }
+.stat { border-top: 2px solid var(--line); padding-top: .6em; min-width: 0; }
+.stat .n { font-family: var(--font-display); font-size: clamp(1.6rem, 5vw, 3.6rem); line-height: 1; }
+.stat .l { color: var(--muted); font-size: var(--small-size); margin-top: .4em; line-height: 1.35; }
+.stat.is-focal { border-top-color: var(--signal); }
+.stat.is-focal .n { color: var(--signal); }
+@media (max-width: 760px) { .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Diagrams */
+.diagram { width: 100%; max-height: min(58vh, 520px); }
+.diagram svg { width: 100%; height: 100%; max-height: min(58vh, 520px); display: block; }
+.d-box { fill: var(--bg-2); stroke: var(--line); stroke-width: 1.4; }
+.d-hot { fill: var(--signal); }
+.d-bound { fill: none; stroke: #9d97ff; stroke-width: 1.4; stroke-dasharray: 6 5; }
+.d-t { fill: var(--text); font-family: var(--font-body); font-weight: 700; font-size: 15px; }
+.d-s { fill: var(--muted); font-family: var(--font-body); font-size: 12px; }
+.d-m { fill: var(--muted); font-family: var(--font-mono); font-size: 11px; }
+.d-ink { fill: var(--signal-ink); }
+.d-edge { stroke: var(--muted); stroke-width: 1.5; fill: none; }
+.d-head { fill: var(--muted); }
+
+/* Verdict demo */
+.verdict { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: var(--content-gap); align-items: center; }
+.sources { display: flex; flex-direction: column; gap: clamp(.4rem, 1vh, .8rem); }
+.src { display: grid; grid-template-columns: auto 1fr auto; gap: .9em; align-items: center; background: var(--bg-2); border: 1px solid var(--line); border-radius: 4px; padding: clamp(.55rem, 1.2vw, 1rem) clamp(.7rem, 1.4vw, 1.2rem); }
+.src .file { font-family: var(--font-mono); font-size: var(--small-size); color: var(--muted); }
+.src .val { font-family: var(--font-display); font-size: clamp(1.1rem, 2.8vw, 2.2rem); }
+.src.odd { border-color: var(--signal); }
+.src.odd .val { color: var(--signal); }
+@media (max-width: 760px) { .verdict { grid-template-columns: 1fr; } }
+
+/* Screenshot slides: one framed app screenshot beside a short caption. Screenshots are
+   1600x900; the frame keeps their ratio and caps the height so the slide never scrolls. */
+.shot { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2.6fr); gap: var(--content-gap); align-items: center; }
+.shot-text h2 { font-size: clamp(1.1rem, 2.6vw, 2.1rem); }
+.shot-text p { font-size: var(--small-size); }
+.shot-frame { margin: 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: .55em; }
+.shot-frame img {
+  display: block; width: auto; height: auto; max-width: 100%; max-height: min(66vh, 720px);
+  border: 1px solid var(--line); border-radius: 6px; background: #000;
+  box-shadow: 0 0 0 4px var(--bg-2), 0 28px 60px -24px rgba(0, 0, 0, .8);
+}
+.shot-frame.is-focal img { border-color: var(--signal); box-shadow: 0 0 0 4px rgba(255, 90, 31, .18), 0 28px 60px -24px rgba(0, 0, 0, .8); }
+.shot-frame figcaption { font-family: var(--font-mono); font-size: var(--small-size); color: var(--muted); }
+/* Portrait screens: caption above, screenshot below. */
+@media (max-aspect-ratio: 1/1) { .shot { grid-template-columns: 1fr; } .shot-frame img { max-height: 46vh; } }
+@media (max-width: 600px) { .shot .bullet-list { display: none; } }
+@media (max-height: 500px) { .shot .bullet-list, .shot-frame figcaption { display: none; } .shot-frame img { max-height: 80vh; } }
+
+/* Title slide atmosphere: abstract geometry only */
+.rings { position: absolute; right: -8vw; bottom: -18vh; width: min(70vw, 760px); aspect-ratio: 1; pointer-events: none; }
+.rings circle { fill: none; stroke: var(--line); }
+.rings .hot { stroke: var(--signal); stroke-width: 2; }
+@media (prefers-reduced-motion: no-preference) { .rings .spin { transform-origin: 50% 50%; animation: spin 60s linear infinite; } }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Reveal animation (only when JS runs, so the deck reads without it) */
+.js .reveal { opacity: 0; transform: translateY(18px); transition: opacity .6s var(--ease), transform .6s var(--ease); }
+.js .slide.visible .reveal { opacity: 1; transform: none; }
+.js .slide.visible .reveal:nth-child(2) { transition-delay: .08s; }
+.js .slide.visible .reveal:nth-child(3) { transition-delay: .16s; }
+.js .slide.visible .reveal:nth-child(4) { transition-delay: .24s; }
+.js .slide.visible .reveal:nth-child(5) { transition-delay: .32s; }
+.js .slide.visible .reveal:nth-child(6) { transition-delay: .40s; }
+
+/* Chrome: progress, counter, dots, hint */
+.progress { position: fixed; left: 0; top: 0; height: 3px; background: var(--signal); width: 0; z-index: 20; transition: width .35s var(--ease); }
+.counter { position: fixed; left: max(1rem, env(safe-area-inset-left, 0px)); bottom: calc(1rem + env(safe-area-inset-bottom, 0px)); font-family: var(--font-mono); font-size: var(--small-size); color: var(--muted); z-index: 20; }
+.nav-dots { position: fixed; right: calc(.9rem + env(safe-area-inset-right, 0px)); top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: .5rem; z-index: 20; margin: 0; padding: 0; list-style: none; }
+.nav-dots button { width: 9px; height: 9px; border-radius: 50%; border: 1px solid var(--muted); background: transparent; padding: 0; cursor: pointer; }
+.nav-dots button[aria-current="true"] { background: var(--signal); border-color: var(--signal); }
+.nav-dots button:focus-visible, .btn:focus-visible { outline: 2px solid var(--signal); outline-offset: 3px; }
+.keyboard-hint { position: fixed; right: max(1rem, env(safe-area-inset-right, 0px)); bottom: calc(1rem + env(safe-area-inset-bottom, 0px)); font-family: var(--font-mono); font-size: var(--small-size); color: var(--muted); z-index: 20; }
+@media (max-width: 600px) { .nav-dots, .keyboard-hint { display: none; } .section-no { font-size: clamp(2.5rem, 18vw, 5rem); } }
+</style>
+</head>
+<body>
+<div class="progress" aria-hidden="true"></div>
+<main id="deck">
+
+  <!-- 1 · Title -->
+  <section class="slide" aria-label="Title">
+    <svg class="rings decorative" viewBox="0 0 400 400" aria-hidden="true">
+      <circle cx="200" cy="200" r="190"/><circle cx="200" cy="200" r="140"/>
+      <g class="spin"><circle class="hot" cx="200" cy="200" r="96" stroke-dasharray="60 540"/></g>
+      <circle cx="200" cy="200" r="44"/>
+      <circle cx="200" cy="105" r="9"/><circle cx="295" cy="200" r="9"/><circle cx="200" cy="295" r="9"/><circle cx="105" cy="200" r="9"/>
+    </svg>
+    <div class="slide-content">
+      <div class="stack hero">
+        <span class="eyebrow reveal">SPEC'26 · Levels 1, 2 and 3</span>
+        <h1 class="reveal">CNC Part<br>Analyzer</h1>
+        <p class="reveal lede">Ask about a part. Get an answer you can trace to the file it came from.</p>
+        <p class="reveal muted mono tagline">Excel record · PDF drawing · IGES 3D model, read and cross-checked</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2 · Intro: the problem -->
+  <section class="slide" aria-label="The problem">
+    <span class="section-no decorative" aria-hidden="true">01</span>
+    <div class="slide-content">
+      <div class="stack">
+        <span class="eyebrow reveal">Intro · the problem</span>
+        <h2 class="reveal">One part, three files, and they don't always agree</h2>
+        <div class="cols3 reveal">
+          <div class="panel"><h3><span class="tag src-xl">Excel</span></h3><p>What the shop records: material, stock, machines, times. Every workbook is laid out differently.</p></div>
+          <div class="panel"><h3><span class="tag src-pdf">PDF</span></h3><p>What engineering specifies: title block, notes, dimensions, revisions. Some are scans.</p></div>
+          <div class="panel"><h3><span class="tag src-ig">IGES</span></h3><p>The geometry itself: diameters, holes, size. Nobody reads it without CAD software.</p></div>
+        </div>
+        <p class="reveal muted">A general chatbot fills the gaps with plausible guesses. On a shop floor a guess becomes a scrapped part.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 · Intro: what we built -->
+  <section class="slide" aria-label="What we built">
+    <span class="section-no decorative" aria-hidden="true">02</span>
+    <div class="slide-content">
+      <div class="stack">
+        <span class="eyebrow reveal">Intro · what we built</span>
+        <div class="focal reveal">
+          <h2>Type a part number. Ask in plain language. Every value comes with its source.</h2>
+        </div>
+        <ul class="bullet-list reveal" style="max-width:64ch">
+          <li>Reads all three file types, including messy exports and inch drawings</li>
+          <li>Cites the exact cell, drawing callout or 3D model feature behind each value</li>
+          <li>Compares the three files and names the one that differs, without "correcting" it</li>
+          <li>Says <b>"I can't find that in the provided files"</b> instead of guessing</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 · Unique features -->
+  <section class="slide" aria-label="Unique features">
+    <span class="section-no decorative" aria-hidden="true">03</span>
+    <div class="slide-content">
+      <div class="stack">
+        <span class="eyebrow reveal">Unique features</span>
+        <h2 class="reveal">What a general chatbot can't do</h2>
+        <div class="features reveal">
+          <div class="feature is-focal"><span class="k">three-way check</span><h3>Names the file that differs</h3><p>Spreadsheet, drawing and model compared field by field. Two agree, one differs: it says which.</p></div>
+          <div class="feature"><span class="k">verified citations</span><h3>Every claim checked in code</h3><p>A cited value must match the stored file, or it is dropped before you see it.</p></div>
+          <div class="feature"><span class="k">measured geometry</span><h3>Reads the 3D model</h3><p>Diameters, bores, hole patterns, volume, measured by a CAD kernel, each with how it was measured.</p></div>
+          <div class="feature"><span class="k">linked selection</span><h3>See it in every file</h3><p>Click a value: the cell, the drawing callout and the model face light up together.</p></div>
+          <div class="feature"><span class="k">consent</span><h3>Asks before reading a scan</h3><p>Scanned drawings are flagged; the vision model reads them only after a yes.</p></div>
+          <div class="feature"><span class="k">honest by design</span><h3>Maths in code, gaps admitted</h3><p>Totals and unit conversions computed with the working shown; missing data said plainly.</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5 · Feature in action -->
+  <section class="slide" aria-label="The three-way check in action">
+    <span class="section-no decorative" aria-hidden="true">04</span>
+    <div class="slide-content">
+      <div class="stack">
+        <span class="eyebrow reveal">In action · part 2283, outer diameter</span>
+        <div class="verdict reveal">
+          <div class="sources">
+            <div class="src odd"><span class="tag src-xl">Excel</span><span class="file">job_cards_B.xlsx › Job Cards › E5</span><span class="val">Ø50</span></div>
+            <div class="src"><span class="tag src-pdf">PDF</span><span class="file">2283_bushing.pdf › p1 › Dimension</span><span class="val">Ø48</span></div>
+            <div class="src"><span class="tag src-ig">IGES</span><span class="file">2283_bushing.igs › Model › od_1</span><span class="val">Ø48</span></div>
+          </div>
+          <div class="focal">
+            <span class="mono" style="font-size:var(--small-size);letter-spacing:.1em">VERDICT · DISAGREE</span>
+            <h3 style="margin-top:.4em">The drawing and the model agree on Ø48. The job card is the odd one out.</h3>
+            <p style="margin-top:.6em;font-size:var(--small-size)">All three values cited. Nothing corrected: the drawing might be the one out of date.</p>
+          </div>
+        </div>
+        <p class="reveal muted">Planted in the test data and caught, along with 3003's hole count (one part card says 6, everything else 4) and 3002's M6 thread matched to its Ø5 tap drill.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5a · Screenshot: Compare view -->
+  <section class="slide" aria-label="Screenshot: the Compare view">
+    <div class="slide-content">
+      <div class="shot">
+        <div class="stack shot-text">
+          <span class="eyebrow reveal">In the app · Compare</span>
+          <h2 class="reveal">Click a value, see it in every file</h2>
+          <p class="reveal muted">Part 2283 with the outer diameter selected.</p>
+          <ul class="bullet-list reveal">
+            <li>Drawing: the Ø48 callout is marked on the page</li>
+            <li>3D model: the measured outer face lights up</li>
+            <li>Front, top and right projections follow</li>
+          </ul>
+        </div>
+        <figure class="shot-frame is-focal reveal">
+          <img src="assets/compare.png" width="1600" height="900" decoding="async"
+               alt="Compare view for part 2283: the PDF drawing on the left with its Ø48 callout marked, the 3D model of the bushing with its outer face highlighted, front, top and right projections below it, and the chat panel on the right.">
+          <figcaption>/parts/2283 · Compare</figcaption>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5b · Screenshot: three-way cross-check and answer -->
+  <section class="slide" aria-label="Screenshot: the three-way cross-check">
+    <div class="slide-content">
+      <div class="shot">
+        <div class="stack shot-text">
+          <span class="eyebrow reveal">In the app · three-way check</span>
+          <h2 class="reveal">The answer names the odd one out</h2>
+          <p class="reveal muted">Asked: "Do the spreadsheet, drawing and 3D model agree?"</p>
+          <ul class="bullet-list reveal">
+            <li>Each field shown per file, with the verdict for every pair</li>
+            <li>The job card is flagged: Ø50 against Ø48</li>
+            <li>The model can't state a material, and says so</li>
+          </ul>
+        </div>
+        <figure class="shot-frame reveal">
+          <img src="assets/crosscheck.png" width="1600" height="900" decoding="async"
+               alt="Part 2283 cross-check: material and outer diameter marked Disagree, the spreadsheet tagged odd one out at Ø50 against Ø48 on the drawing and the model, bore marked Agree, and Claude's answer on the right listing the two disagreements and saying it is not choosing a winner.">
+          <figcaption>/parts/2283 · answered by Claude, 14 of 14 citations verified</figcaption>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6 · Solution architecture -->
+  <section class="slide" aria-label="Solution architecture">
+    <span class="section-no decorative" aria-hidden="true">05</span>
+    <div class="slide-content">
+      <div class="stack">
+        <span class="eyebrow reveal">Solution architecture</span>
+        <h2 class="reveal">Files become facts. Code checks them. The model only writes the sentence.</h2>
+        <div class="diagram reveal">
+          <svg viewBox="0 0 1100 400" role="img" aria-label="Excel, PDF and IGES files are read by their own readers, the IGES reader in an isolated worker process, into one fact shape, cross-checked and stored. A question goes through a guard and a prompt to the language model, then a verifier and compute engine, and comes back as an answer with citations.">
+            <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" class="d-head"/></marker></defs>
+            <!-- ingestion row -->
+            <rect class="d-box" x="10" y="20" width="150" height="40" rx="3"/><text class="d-t" x="85" y="45" text-anchor="middle" style="fill:#4fd39a">Excel</text>
+            <rect class="d-box" x="10" y="76" width="150" height="40" rx="3"/><text class="d-t" x="85" y="101" text-anchor="middle" style="fill:#ff8a9b">PDF</text>
+            <rect class="d-box" x="10" y="132" width="150" height="40" rx="3"/><text class="d-t" x="85" y="157" text-anchor="middle" style="fill:#9d97ff">IGES</text>
+            <rect class="d-box" x="200" y="20" width="190" height="152" rx="3"/>
+            <text class="d-t" x="295" y="52" text-anchor="middle">Readers</text>
+            <text class="d-s" x="295" y="76" text-anchor="middle">openpyxl · pdfplumber</text>
+            <text class="d-s" x="295" y="96" text-anchor="middle">OpenCascade kernel</text>
+            <rect class="d-bound" x="214" y="112" width="162" height="46" rx="3"/>
+            <text class="d-m" x="295" y="140" text-anchor="middle" style="fill:#9d97ff">isolated worker process</text>
+            <rect class="d-box" x="430" y="20" width="200" height="152" rx="3"/>
+            <text class="d-t" x="530" y="52" text-anchor="middle">One fact shape</text>
+            <text class="d-m" x="530" y="82" text-anchor="middle" style="fill:#4fd39a">file!Sheet!C2</text>
+            <text class="d-m" x="530" y="106" text-anchor="middle" style="fill:#ff8a9b">file!p1!tb!material</text>
+            <text class="d-m" x="530" y="130" text-anchor="middle" style="fill:#9d97ff">file!m!od_1</text>
+            <rect class="d-box" x="670" y="20" width="190" height="152" rx="3"/>
+            <text class="d-t" x="765" y="70" text-anchor="middle">Three-way check</text>
+            <text class="d-s" x="765" y="94" text-anchor="middle">pairwise, in code</text>
+            <text class="d-s" x="765" y="114" text-anchor="middle">units · conventions</text>
+            <rect class="d-box" x="900" y="20" width="190" height="152" rx="3"/>
+            <text class="d-t" x="995" y="70" text-anchor="middle">PostgreSQL</text>
+            <text class="d-s" x="995" y="94" text-anchor="middle">part records + audit</text>
+            <text class="d-s" x="995" y="114" text-anchor="middle">file store: meshes, pages</text>
+            <line class="d-edge" x1="160" y1="40" x2="198" y2="60" marker-end="url(#ah)"/>
+            <line class="d-edge" x1="160" y1="96" x2="198" y2="96" marker-end="url(#ah)"/>
+            <line class="d-edge" x1="160" y1="152" x2="198" y2="132" marker-end="url(#ah)"/>
+            <line class="d-edge" x1="390" y1="96" x2="428" y2="96" marker-end="url(#ah)"/>
+            <line class="d-edge" x1="630" y1="96" x2="668" y2="96" marker-end="url(#ah)"/>
+            <line class="d-edge" x1="860" y1="96" x2="898" y2="96" marker-end="url(#ah)"/>
+            <!-- answer row -->
+            <text class="d-m" x="10" y="232">ANSWERING A QUESTION</text>
+            <g>
+              <rect class="d-box" x="10" y="250" width="130" height="64" rx="3"/><text class="d-t" x="75" y="287" text-anchor="middle">Question</text>
+              <rect class="d-box" x="166" y="250" width="130" height="64" rx="3"/><text class="d-t" x="231" y="280" text-anchor="middle">Guard</text><text class="d-s" x="231" y="298" text-anchor="middle">+ resolve part</text>
+              <rect class="d-box" x="322" y="250" width="130" height="64" rx="3"/><text class="d-t" x="387" y="280" text-anchor="middle">Prompt</text><text class="d-s" x="387" y="298" text-anchor="middle">record as facts</text>
+              <rect class="d-hot" x="478" y="250" width="150" height="64" rx="3"/><text class="d-t d-ink" x="553" y="280" text-anchor="middle">Language model</text><text class="d-s d-ink" x="553" y="298" text-anchor="middle">Claude → Groq</text>
+              <rect class="d-box" x="654" y="250" width="130" height="64" rx="3"/><text class="d-t" x="719" y="280" text-anchor="middle">Verify</text><text class="d-s" x="719" y="298" text-anchor="middle">every citation</text>
+              <rect class="d-box" x="810" y="250" width="130" height="64" rx="3"/><text class="d-t" x="875" y="280" text-anchor="middle">Compute</text><text class="d-s" x="875" y="298" text-anchor="middle">maths in code</text>
+              <rect class="d-box" x="966" y="250" width="124" height="64" rx="3" style="stroke:var(--text)"/><text class="d-t" x="1028" y="280" text-anchor="middle">Answer</text><text class="d-s" x="1028" y="298" text-anchor="middle">with sources</text>
+            </g>
+            <line class="d-edge" x1="140" y1="282" x2="164" y2="282" marker-end="url(#ah)"/>
+            <line class="d-edge" x1="296" y1="282" x2="320" y2="282" marker-end="url(#ah)"/>
+            <line class="d-edge" x1="452" y1="282" x2="476" y2="282" marker-end="url(#ah)"/>
+            <line class="d-edge" x1="628" y1="282" x2="652" y2="282" marker-end="url(#ah)"/>
+            <line class="d-edge" x1="784" y1="282" x2="808" y2="282" marker-end="url(#ah)"/>
+            <line class="d-edge" x1="940" y1="282" x2="964" y2="282" marker-end="url(#ah)"/>
+            <path class="d-edge" d="M995 172 C 995 205, 387 205, 387 248" stroke-dasharray="4 4" marker-end="url(#ah)"/>
+            <text class="d-m" x="690" y="236" text-anchor="middle">the part's record and its verdicts</text>
+            <text class="d-m" x="553" y="344" text-anchor="middle" style="fill:var(--signal)">the only step that is not code</text>
+          </svg>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7 · Technical approach: reading the files -->
+  <section class="slide" aria-label="Technical approach: reading the files">
+    <span class="section-no decorative" aria-hidden="true">06</span>
+    <div class="slide-content">
+      <div class="stack">
+        <span class="eyebrow reveal">Technical approach · reading the files</span>
+        <h2 class="reveal">Each format read on its own terms</h2>
+        <div class="cols3 reveal">
+          <div class="panel">
+            <h3><span class="tag src-xl">Excel</span></h3>
+            <ul class="bullet-list">
+              <li>Finds the header row, even under a banner</li>
+              <li>Maps columns to 26 manufacturing fields</li>
+              <li>P-3001, 003001 and 3001 are one part</li>
+              <li>Archived and superseded rows kept as history</li>
+            </ul>
+          </div>
+          <div class="panel">
+            <h3><span class="tag src-pdf">PDF</span></h3>
+            <ul class="bullet-list">
+              <li>Title block, notes, dimensions, revisions</li>
+              <li>Rotated text and pages turned upright</li>
+              <li>Follows "SEE NOTE 3" to the note</li>
+              <li>Scans flagged; vision only with consent</li>
+            </ul>
+          </div>
+          <div class="panel">
+            <h3><span class="tag src-ig">IGES</span></h3>
+            <ul class="bullet-list">
+              <li>OpenCascade, in a worker with time and memory limits</li>
+              <li>Holes vs bosses, through vs blind, PCD vs grid</li>
+              <li>Envelope measured in the part's own frame</li>
+              <li>Never states material, tolerance or weight</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7a · Screenshot: the 3D model -->
+  <section class="slide" aria-label="Screenshot: the measured 3D model">
+    <div class="slide-content">
+      <div class="shot">
+        <div class="stack shot-text">
+          <span class="eyebrow reveal">In the app · 3D model</span>
+          <h2 class="reveal">Geometry measured, not guessed</h2>
+          <p class="reveal muted">Part 2280 flange with its hole pattern selected.</p>
+          <ul class="bullet-list reveal">
+            <li>6 × Ø10 through on Ø90 PCD, found by the CAD kernel</li>
+            <li>Every feature says how it was measured</li>
+            <li>Asked for a price, it says no file has one</li>
+          </ul>
+        </div>
+        <figure class="shot-frame reveal">
+          <img src="assets/model.png" width="1600" height="900" decoding="async"
+               alt="3D model tab for part 2280: the flange with its six pitch-circle holes highlighted and the central bore in blue, and the chat panel answering that the unit price is not in the provided files.">
+          <figcaption>/parts/2280 · 3D model 2280_flange.igs</figcaption>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- 8 · Technical approach: keeping the model honest -->
+  <section class="slide" aria-label="Technical approach: keeping the model honest">
+    <span class="section-no decorative" aria-hidden="true">07</span>
+    <div class="slide-content">
+      <div class="stack">
+        <span class="eyebrow reveal">Technical approach · the language model</span>
+        <h2 class="reveal">The model writes. Code decides what is true.</h2>
+        <div class="row reveal">
+          <div class="focal" style="flex:1 1 300px">
+            <h3>Never left to the model</h3>
+            <p style="margin-top:.5em">Reading values from files, converting units, adding numbers, comparing files, reading a scan without a yes.</p>
+          </div>
+          <div class="panel" style="flex:1 1 300px">
+            <ul class="bullet-list">
+              <li>Structured answer: status, text, cited fact ids with quoted values</li>
+              <li>Verifier drops any citation that doesn't match the file</li>
+              <li>File text is data: injected instructions are refused</li>
+              <li>Claude first, Groq on failure, offline rules with no keys</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 8a · Screenshot: a computed answer -->
+  <section class="slide" aria-label="Screenshot: a computed answer">
+    <div class="slide-content">
+      <div class="shot">
+        <div class="stack shot-text">
+          <span class="eyebrow reveal">In the app · computed answers</span>
+          <h2 class="reveal">The maths is done in code</h2>
+          <p class="reveal muted">Part 2280: "What is the total setup time?"</p>
+          <ul class="bullet-list reveal">
+            <li>5 + 3 + 4 = 12 min, worked by the app, not the model</li>
+            <li>Each source chip opens its cell in the record</li>
+            <li>3 of 3 citations verified against the workbook</li>
+          </ul>
+        </div>
+        <figure class="shot-frame reveal">
+          <img src="assets/answer.png" width="1600" height="900" decoding="async"
+               alt="Part 2280 answer marked Computed from the files: total setup time 12 min with the working 5 + 3 + 4 = 12 min, source chips for Operations cells F2, F3 and F4, and the Operations sheet on the left with the cited cell highlighted.">
+          <figcaption>/parts/2280 · Operations sheet, mfg_record_A.xlsx</figcaption>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- 8b · Screenshot: consent before reading a scan -->
+  <section class="slide" aria-label="Screenshot: consent before reading a scan">
+    <div class="slide-content">
+      <div class="shot">
+        <div class="stack shot-text">
+          <span class="eyebrow reveal">In the app · scanned drawings</span>
+          <h2 class="reveal">Asks before reading a scan</h2>
+          <p class="reveal muted">Part P-3001: the drawing is an image with no text layer.</p>
+          <ul class="bullet-list reveal">
+            <li>Says it can't read the drawing yet, and why</li>
+            <li>Answers from the sheet and the model meanwhile</li>
+            <li>The archived row is noted, never used as current</li>
+          </ul>
+        </div>
+        <figure class="shot-frame reveal">
+          <img src="assets/consent.png" width="1600" height="900" decoding="async"
+               alt="Part P-3001 answer marked Needs your go-ahead: the scanned drawing has not been read, values from the Master List sheet and the 3D model are given meanwhile, and an orange button offers to read the scan with the vision model.">
+          <figcaption>/parts/3001 · messy workshop export, header on row 6</figcaption>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- 9 · Feasibility -->
+  <section class="slide" aria-label="Feasibility">
+    <span class="section-no decorative" aria-hidden="true">08</span>
+    <div class="slide-content">
+      <div class="stack">
+        <span class="eyebrow reveal">Feasibility</span>
+        <h2 class="reveal">It runs today, and it is tested</h2>
+        <div class="stats reveal">
+          <div class="stat is-focal"><div class="n">80/80</div><div class="l">golden questions passed by Claude, 0 wrong answers</div></div>
+          <div class="stat"><div class="n">371</div><div class="l">automated tests: 340 backend, 31 frontend</div></div>
+          <div class="stat"><div class="n">8/8</div><div class="l">3D models measured to their answer-key sizes</div></div>
+          <div class="stat"><div class="n">6.5 s</div><div class="l">median answer time with Claude</div></div>
+        </div>
+        <ul class="bullet-list reveal" style="max-width:70ch">
+          <li>One command to run it: <span class="mono">docker compose up --build</span></li>
+          <li>Works without API keys, on a deterministic offline engine</li>
+          <li>Mature open stack: FastAPI, PostgreSQL, OpenCascade, Next.js</li>
+          <li>Caveat: the sample 3D models were generated from the answer keys</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 10 · Impact -->
+  <section class="slide" aria-label="Impact">
+    <span class="section-no decorative" aria-hidden="true">09</span>
+    <div class="slide-content">
+      <div class="stack">
+        <span class="eyebrow reveal">Impact</span>
+        <h2 class="reveal">Catch the mismatch before the metal is cut</h2>
+        <div class="cols3 reveal">
+          <div class="panel"><h3>Process planners</h3><p>Answers in seconds instead of opening three files, with the source one click away.</p></div>
+          <div class="panel"><h3>Quality and inspection</h3><p>Spreadsheet, drawing and model disagreements flagged before production, not found on the part.</p></div>
+          <div class="panel"><h3>Engineering</h3><p>An audit trail: every answer, citation and model call is stored and can be reviewed.</p></div>
+        </div>
+        <div class="focal reveal" style="max-width:min(90vw,880px)">
+          <p style="font-size:var(--h3-size);font-weight:700;color:var(--signal-ink);max-width:none">Trust comes from traceability: an answer you can check is an answer you can act on.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 11 · Next -->
+  <section class="slide" aria-label="Next steps">
+    <span class="section-no decorative" aria-hidden="true">10</span>
+    <div class="slide-content">
+      <div class="stack">
+        <span class="eyebrow reveal">What's next</span>
+        <h2 class="reveal">Built to extend</h2>
+        <ul class="bullet-list reveal" style="max-width:64ch">
+          <li>STEP files: the same kernel already reads them</li>
+          <li>Slots, pockets and keyways on prismatic parts</li>
+          <li>Linking drawing callouts to geometry through leader lines</li>
+          <li>Accounts and per-team workspaces</li>
+        </ul>
+        <p class="reveal muted">Adding a source means writing one reader to the shared fact shape; the answer pipeline does not change.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 12 · Close -->
+  <section class="slide" aria-label="Closing">
+    <svg class="rings decorative" viewBox="0 0 400 400" aria-hidden="true">
+      <circle cx="200" cy="200" r="190"/><circle cx="200" cy="200" r="140"/>
+      <g class="spin"><circle class="hot" cx="200" cy="200" r="96" stroke-dasharray="60 540"/></g>
+      <circle cx="200" cy="200" r="44"/>
+    </svg>
+    <div class="slide-content">
+      <div class="stack hero">
+        <span class="eyebrow reveal">CNC Part Analyzer</span>
+        <h1 class="reveal">Every answer,<br><span class="accent">traced to its source.</span></h1>
+        <p class="reveal muted mono tagline">github.com/Ahmedgito/CNC_Analysis · try part 2283 → Compare</p>
+      </div>
+    </div>
+  </section>
+
+</main>
+<nav aria-label="Slides"><ol class="nav-dots"></ol></nav>
+<div class="counter" aria-live="polite"></div>
+<div class="keyboard-hint" aria-hidden="true">← → or scroll</div>
+
+<script>
+/**
+ * Presentation controller: keyboard, wheel and touch navigation, progress bar, slide counter,
+ * navigation dots, and reveal-on-enter through an IntersectionObserver.
+ */
+class Deck {
+  constructor(root) {
+    this.slides = [...root.querySelectorAll(".slide")];
+    this.index = 0;
+    this.progress = document.querySelector(".progress");
+    this.counter = document.querySelector(".counter");
+    this.dots = document.querySelector(".nav-dots");
+    this.reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    this.lock = false;
+    document.documentElement.classList.add("js");
+    this.buildDots();
+    this.observe();
+    this.bindKeys();
+    this.bindWheel();
+    this.bindTouch();
+    this.update(0);
+  }
+
+  buildDots() {
+    this.slides.forEach((s, i) => {
+      const li = document.createElement("li");
+      const b = document.createElement("button");
+      b.type = "button";
+      b.setAttribute("aria-label", `Slide ${i + 1}: ${s.getAttribute("aria-label")}`);
+      b.addEventListener("click", () => this.go(i));
+      li.appendChild(b);
+      this.dots.appendChild(li);
+    });
+  }
+
+  observe() {
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting && e.intersectionRatio > 0.55) {
+            e.target.classList.add("visible");
+            this.update(this.slides.indexOf(e.target));
+          }
+        }
+      },
+      { threshold: [0.55] },
+    );
+    this.slides.forEach((s) => io.observe(s));
+    this.slides[0].classList.add("visible");
+  }
+
+  update(i) {
+    this.index = i;
+    this.progress.style.width = `${((i + 1) / this.slides.length) * 100}%`;
+    this.counter.textContent = `${String(i + 1).padStart(2, "0")} / ${String(this.slides.length).padStart(2, "0")}`;
+    [...this.dots.querySelectorAll("button")].forEach((b, j) => b.setAttribute("aria-current", String(i === j)));
+  }
+
+  go(i) {
+    const next = Math.max(0, Math.min(this.slides.length - 1, i));
+    this.slides[next].scrollIntoView({ behavior: this.reduced ? "auto" : "smooth" });
+    this.update(next);
+  }
+
+  bindKeys() {
+    addEventListener("keydown", (e) => {
+      if (e.target.closest && e.target.closest("input, textarea")) return;
+      const nextKeys = ["ArrowDown", "ArrowRight", "PageDown", " ", "Enter"];
+      const prevKeys = ["ArrowUp", "ArrowLeft", "PageUp"];
+      if (nextKeys.includes(e.key)) { e.preventDefault(); this.go(this.index + 1); }
+      else if (prevKeys.includes(e.key)) { e.preventDefault(); this.go(this.index - 1); }
+      else if (e.key === "Home") { e.preventDefault(); this.go(0); }
+      else if (e.key === "End") { e.preventDefault(); this.go(this.slides.length - 1); }
+    });
+  }
+
+  bindWheel() {
+    // One slide per wheel gesture; trackpads fire many small events.
+    addEventListener("wheel", (e) => {
+      if (Math.abs(e.deltaY) < 8) return;
+      e.preventDefault();
+      if (this.lock) return;
+      this.lock = true;
+      this.go(this.index + (e.deltaY > 0 ? 1 : -1));
+      setTimeout(() => (this.lock = false), 700);
+    }, { passive: false });
+  }
+
+  bindTouch() {
+    let y0 = null;
+    addEventListener("touchstart", (e) => (y0 = e.touches[0].clientY), { passive: true });
+    addEventListener("touchend", (e) => {
+      if (y0 === null) return;
+      const dy = y0 - e.changedTouches[0].clientY;
+      if (Math.abs(dy) > 40) this.go(this.index + (dy > 0 ? 1 : -1));
+      y0 = null;
+    }, { passive: true });
+  }
+}
+
+new Deck(document.getElementById("deck"));
+</script>
+</body>
+</html>
