@@ -62,8 +62,10 @@ report, and an admin page over the existing `/admin/llm-calls` endpoint.
   keys), source chips, ask box (Enter sends, Shift+Enter adds a line).
 - Visible focus rings on every interactive element.
 - Answers are announced through an `aria-live="polite"` region; errors use `role="alert"`.
-- `prefers-reduced-motion` turns off ambient motion and shortens transitions app-wide
-  (`MotionConfig reducedMotion="user"`, and the canvas checks the media query).
+- `prefers-reduced-motion` turns off ambient motion app-wide by default. A Motion control in
+  the navbar cycles System (follow the OS), Full and Reduced, stored per browser. Every animated
+  component reads the same setting through `MotionConfig` and `useReducedMotionConfig`, including
+  the canvas background, which also stops drawing while off screen.
 - Contrast is checked for both themes; status is always icon plus text plus colour.
 
 ## 6. Theming and tokens
@@ -109,4 +111,5 @@ registry.
 | Trust section | Bento grid with live mini-demos | `kokonutd/bento-grid` | Written here |
 | Global navigation | Command palette (⌘K) | command menu family | Written here |
 | Source chips | Hover preview card | animated tooltip family | Written here |
-| Theme | Animated sun/moon toggle | theme toggle family | Written here |
+| Theme | Animated sun/moon/system toggle | theme toggle family | Written here |
+| Motion setting | Animated System / Full / Reduced toggle | (no catalogue match) | Written here |

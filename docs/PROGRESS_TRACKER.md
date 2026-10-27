@@ -29,6 +29,8 @@ Status key: `todo` · `doing` · `done` · `blocked` · `cut`
 | 18 | 4 | Adversarial golden rows, schema-drift workbook, failover demo | doing | Drift workbook, injection and failover covered by tests; live failover needs keys |
 | 19 | 4 | CI workflow, pre-commit, ADRs, README with eval table, smoke script | done | Both Docker images build; containerised stack passes `scripts/smoke.py` and streams SSE through the proxy. CI workflow not yet run on GitHub (no remote) |
 | 20 | 5 | Demo rehearsal, fixes, Level 2 seam check | todo | |
+| 21 | 5 | Enterprise frontend redesign: animated, responsive, 21st.dev component set | done | Spec in `docs/FRONTEND_DESIGN.md`. Grid Beam and AI Chat Input retrieved from 21st.dev; the rest written in their style (free tier allows 2 retrievals a day). Verified in Chrome at desktop and phone widths, dark and light, with a live Groq answer |
+| 22 | 5 | Fix double unit conversion in compute (`c1 / 25.4` plus `unit_out: in` gave 0.1938 in for Ø125) | todo | Found in the live UI. Reject or neutralise conversion constants when `unit_out` is set, and tell the model not to put factors in the expression |
 
 ## Acceptance checklist (Level 1)
 
