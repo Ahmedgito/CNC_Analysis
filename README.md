@@ -1,15 +1,17 @@
 # CNC Part Analyzer
 
-Type a part number, see its manufacturing record and engineering drawing, and ask questions in
-plain language. Every answer is checked against the files in code and links to the exact
-spreadsheet cell or drawing callout it came from, and says which file that is. Where the
-spreadsheet and the drawing disagree, the app shows both values and never picks one. When the
-files don't contain the answer, it says **"I can't find that in the provided files"** instead of
-guessing.
+Type a part number, see its manufacturing record, engineering drawing and 3D model, and ask
+questions in plain language. Every answer is checked against the files in code and links to the
+exact spreadsheet cell, drawing callout or measured model feature it came from, and says which
+file that is. Where the files disagree, the app shows every value and names the file that
+differs, but never picks one. When the files don't contain the answer, it says **"I can't find
+that in the provided files"** instead of guessing.
 
-Built for SPEC'26. This repo delivers **Level 1 (Core)**, the Excel manufacturing record, and
-**Level 2**, the PDF drawing combined and cross-checked with it. The IGES model (Level 3) plugs
-into the same evidence model; see [Roadmap](#roadmap).
+Built for SPEC'26. All three levels are delivered: **Level 1**, the Excel manufacturing record;
+**Level 2**, the PDF drawing combined and cross-checked with it; and **Level 3**, the IGES 3D
+model, measured with a CAD kernel and cross-checked against both. The
+[technical document](docs/TECHNICAL.md) covers the architecture, how each file type is read, how
+the LLM is used, and the limitations.
 
 ## What it does
 
@@ -31,6 +33,19 @@ into the same evidence model; see [Roadmap](#roadmap).
   records agree *after conversion*; Ra 3.2 against 125 RMS is *equivalent by convention*; an
   unstated unit is never called a disagreement. Part 2283's brass-versus-bronze and Ø50-versus-Ø48
   are reported with both files cited.
+- **3D models measured, not guessed.** IGES files are read with OpenCascade in an isolated worker
+  process: outer diameters and steps, bores, holes (through or blind, radial, counterbored), hole
+  patterns (`6 × Ø10 on Ø90 PCD`, or a `2 × 2 grid at 160 × 80`), the envelope in the part's own
+  frame, chamfers, volume and surface area. Each value records how it was measured. A model never
+  supplies material, tolerance, finish, threads or weight.
+- **Three files, cross-checked.** Every field is compared pairwise across the spreadsheet, the
+  drawing and the model. Part 2283's job card is named the odd one out (drawing and model say
+  Ø48, the job card Ø50); 3003's part card is the one cell saying 6 holes; 3002's Ø5 radial hole
+  matches its M6 thread by the tap-drill convention; the raw stock is checked to fit the part.
+- **See it in every file at once.** Clicking a value anywhere highlights the same field in the
+  other files: the spreadsheet cell, the callout on the rendered drawing and the face on the 3D
+  model. A Compare view shows the drawing and the interactive model side by side, with
+  hidden-line projections that also work without WebGL.
 - **Scans need your OK.** A scanned drawing has no text to read. The app says so, offers to read it
   with a vision model, and does nothing until you agree. Values read that way are labelled.
 - **Verified, not trusted.** The model's citations are checked against the stored cell values
@@ -50,13 +65,13 @@ into the same evidence model; see [Roadmap](#roadmap).
 ```mermaid
 flowchart LR
   subgraph Browser
-    UI[Next.js app<br/>part picker · record viewer · chat]
+    UI[Next.js app<br/>record · drawing · 3D viewer · chat<br/>linked selection]
   end
   UI -- "/api/backend/* (same-origin, streamed)" --> Proxy[Next.js route handler]
   Proxy -- REST + SSE --> API[FastAPI]
   subgraph Backend
     API --> Guard[Question guard]
-    Guard --> Ctx[Record context<br/>cells, drawing facts,<br/>cross-checks]
+    Guard --> Ctx[Record context<br/>cells · drawing facts · model features<br/>three-way cross-checks]
     Ctx --> GW[Failover gateway]
     GW --> A[Anthropic<br/>claude-opus-5-5]
     GW -. fallback .-> G[Groq<br/>gpt-oss-120b]
@@ -65,9 +80,11 @@ flowchart LR
     V --> C[Compute engine<br/>safe AST · pint]
     API -. "only after a yes" .-> Vis[Vision model<br/>scanned drawings]
   end
-  Ingest[Ingestion<br/>xlsx · xls · csv · pdf] --> X[Cross-check<br/>units · conventions]
-  X --> DB[(PostgreSQL 18<br/>cells · drawing facts · parts · calls)]
-  Ingest --> Store[(File store<br/>PDFs · rendered pages)]
+  Ingest[Ingestion<br/>xlsx · xls · csv · pdf] --> X[Three-way cross-check<br/>units · conventions · odd one out]
+  IGES[IGES · OpenCascade<br/>isolated worker process] --> X
+  X --> DB[(PostgreSQL 18<br/>cells · drawing facts · model facts · parts · calls)]
+  Ingest --> Store[(File store<br/>PDFs · page images · meshes · projections)]
+  IGES --> Store
   API --> DB
 ```
 
@@ -77,7 +94,8 @@ How an answer is produced:
    injection phrasing.
 2. **Resolve.** An unknown part number returns suggestions with no LLM call.
 3. **Prompt.** The whole part record goes in as addressable facts: spreadsheet cells, drawing
-   title block, notes and dimensions, history flagged, and the cross-check verdicts. Values are
+   title block, notes and dimensions, measured model features with how each was measured,
+   history flagged, and the three-way cross-check verdicts. Values are
    JSON-encoded so file text can't impersonate instructions. A question that needs an unread scan
    stops here with `needs_consent` and a read-scan action.
 4. **LLM.** Every provider returns the same structured contract: status, answer, cited cells,
@@ -88,11 +106,17 @@ How an answer is produced:
 7. **Persist.** The conversation and every LLM attempt are stored, with provider, latency, tokens
    and cost.
 
-Design decisions are recorded in [docs/adr](docs/adr).
+Design decisions are recorded in [docs/adr](docs/adr); the full write-up is
+[docs/TECHNICAL.md](docs/TECHNICAL.md). The
+[architecture diagrams](https://claude.ai/artifact/5ExmHbL4b9mhVomByiJCad) show the file-to-fact
+flow, the answer pipeline and a worked three-way check (a private page until it is shared).
 
 ## Quick start
 
-With Docker (Postgres, API and web app; the sample data in `data/` is ingested on startup):
+### With Docker (everything in containers)
+
+Postgres, API and web app; the sample data in `data/` (workbooks, drawings and IGES models) is
+ingested on startup.
 
 ```bash
 cp backend/.env.example backend/.env   # optional: add ANTHROPIC_API_KEY / GROQ_API_KEY
@@ -100,21 +124,52 @@ docker compose up --build
 # open http://localhost:3000
 ```
 
-### Run without Docker for the app
+Without API keys the app answers with the offline rules engine, which is labelled as such.
 
-Prerequisites: Python 3.11+ with [uv](https://docs.astral.sh/uv/), Node 22 with pnpm, and
-PostgreSQL. `docker compose up -d db` provides Postgres on host port 5434, or point
-`DATABASE_URL` at your own server.
+### Without Docker for the app
+
+Prerequisites: Python 3.11 with [uv](https://docs.astral.sh/uv/), Node 22 with pnpm, and
+PostgreSQL 18. `docker compose up -d db` provides Postgres on host port 5434; to use your own
+server, create a `cnc` database (and `cnc_test` for the tests) and set `DATABASE_URL` in
+`backend/.env`. On Linux the 3D kernel needs the GL runtime libraries
+(`sudo apt-get install libgl1 libglu1-mesa libxrender1 libxext6`); Windows and macOS need nothing
+extra.
 
 ```bash
-docker compose up -d db
-cd backend && uv sync && uv run alembic upgrade head && uv run cnc ingest ../data
-uv run cnc serve                         # API on http://127.0.0.1:8000 (docs at /docs)
-cd ../frontend && pnpm install && pnpm dev   # web on http://localhost:3000
+docker compose up -d db                   # or your own Postgres; see DATABASE_URL
+cd backend
+uv sync                                   # includes the OpenCascade kernel (cadquery-ocp-novtk)
+uv run alembic upgrade head
+uv run cnc ingest ../data                 # spreadsheets, drawings and IGES models; idempotent
+uv run cnc serve                          # API on http://127.0.0.1:8000 (docs at /docs)
+
+cd ../frontend
+pnpm install
+pnpm dev                                  # web on http://localhost:3000
 ```
+
+Then open `http://localhost:3000`, pick part **2283**, press **Compare**, and ask "Do the
+spreadsheet, drawing and 3D model agree?".
 
 With [just](https://github.com/casey/just) installed, the same steps are `just db-up install migrate
 ingest`, then `just api` and `just web`. Run `just --list` for everything else.
+
+### Tests
+
+```bash
+cd backend && uv run pytest -q            # needs Postgres; set DATABASE_URL_TEST if it is not
+                                          # postgresql+psycopg://cnc:cnc@localhost:5434/cnc_test
+cd frontend && pnpm test && pnpm lint && pnpm typecheck && pnpm build
+```
+
+### Maintenance commands
+
+| Command (from `backend/`) | Use |
+|---|---|
+| `uv run cnc rebuild` | Regroup stored fragments into part records after an upgrade |
+| `uv run cnc reprocess [files…]` | Re-measure stored IGES models with the current extractor and rebuild meshes and projections |
+| `uv run cnc reset-drawing <pdf>` | Re-read a drawing from its PDF, discarding a vision reading of a scan |
+| `uv run cnc eval --provider fake\|claude_code\|anthropic\|groq --out ../docs/eval/<name>.md` | Golden-set evaluation |
 
 ## Configuration
 
@@ -133,6 +188,8 @@ Backend settings come from environment variables or `backend/.env`
 | `ANTHROPIC_MODEL` / `GROQ_MODEL` | `claude-opus-5-5` / `openai/gpt-oss-120b` | Model per provider |
 | `LLM_EFFORT` | `medium` | Claude effort level |
 | `DATA_DIR`, `AUTO_INGEST` | `../data`, `false` | Ingest a folder on startup |
+| `GEOMETRY_TIMEOUT_S`, `GEOMETRY_MEMORY_MB` | `30`, `1536` | Limits for the isolated 3D geometry worker |
+| `IGES_MAX_MB` | `25` | Largest IGES file accepted |
 
 The web app reads `BACKEND_URL` (default `http://127.0.0.1:8000`) in its proxy route.
 
@@ -150,6 +207,13 @@ The web app reads `BACKEND_URL` (default `http://127.0.0.1:8000`) in its proxy r
 | 3003 | How many holes does it have? | Part card says 6, master list and drawing say 4: reported as a disagreement |
 | 3002 | What is the bore diameter? | Ø20 from Rev B; Rev A's Ø18 is history |
 | 3001 | What does the drawing say? | It's a scan: asks before reading it with the vision model |
+| 3001 | What is the bore diameter? | Ø25 from the sheet and the 3D model, while the scan stays unread |
+| 2283 | What is the outer diameter according to each file? | Drawing and model Ø48, job card Ø50: the job card is the odd one out |
+| 2280 | What is the volume of the 3D model? | 191637.15 mm³, measured from `2280_flange.igs` |
+| 2280 | Does the part fit in the raw stock? | Ø125 × 25 bar around a Ø120 × 20 part: 2.5 mm per side, 5 mm on length |
+| 3002 | What thread is in the hub, and what does the model show? | M6 on drawing and sheet; the model has a Ø5 radial hole, the M6 tap drill |
+| 2281 | How much does the part weigh? | Not in the files: the model gives a volume, but no file gives a density |
+| 2284 | What is the volume of the 3D model? | Not in the files: no model exists for this part |
 | 2284 | What does the drawing title block say? | Not in the files: no PDF is available for this part |
 | any | What is the unit price? | Not in the files, plus the fields the record does contain |
 | 9999 | What material is it? | Unknown part, with suggestions and no LLM call |
@@ -191,40 +255,50 @@ What the runs taught us, all now fixed and covered by tests:
 | Check | Command | Status |
 |---|---|---|
 | Backend lint, format, types | `uv run ruff check . && uv run ruff format --check . && uv run pyright` | clean |
-| Backend tests (unit and API with Postgres) | `uv run pytest -q` | 264 passing |
-| Frontend lint, format, types | `pnpm lint && pnpm format:check && pnpm typecheck` | clean |
-| Frontend tests | `pnpm test` | 24 passing |
+| Backend tests (unit and API with Postgres) | `uv run pytest -q` | 340 passing |
+| Frontend lint, format, types, build | `pnpm lint && pnpm format:check && pnpm typecheck && pnpm build` | clean |
+| Frontend tests | `pnpm test` | 31 passing |
 | CI | [.github/workflows/ci.yml](.github/workflows/ci.yml) | runs all of the above plus the offline eval |
 
 ## Repository layout
 
 ```
-backend/    FastAPI service: ingestion, LLM gateway, verifier, compute, API, CLI, tests, evals
-frontend/   Next.js 16 app (Tailwind CSS v4): part picker, record viewer, chat with source chips
-data/       Sample workbooks and drawings (both datasets) ingested by the demo
-docs/       Plan, progress tracker, ADRs, eval reports, synthetic test data
+backend/    FastAPI service: ingestion, geometry (OpenCascade worker), cross-check, LLM gateway,
+            verifier, compute, API, CLI, tests, evals
+frontend/   Next.js 16 app (Tailwind CSS v4): part picker, record viewer, drawing overlay,
+            3D viewer (three.js), chat with source chips
+data/       Sample workbooks, drawings and IGES models (both datasets) ingested by the demo
+docs/       Technical document, plans, progress tracker, ADRs, eval reports, synthetic test data
+tools/      generate_iges.py: builds the sample IGES models from the answer keys
 ```
 
 ## Limitations
 
-- Questions that need the 3D model are answered "not in the files" until Level 3 lands.
-- Drawing geometry is read from text only: dimensions are callout strings, not measured lines,
-  and a callout is linked to a feature by its wording (`BORE`, `THK`, `PCD`), not by leader lines.
-- Cross-checks cover the fields listed above; other fields both files state are left to the
-  model, which must say the comparison is its own.
-- A scanned drawing needs a configured vision model (Anthropic API key or Claude Code) and the
-  user's agreement. `uv run cnc reset-drawing <pdf>` discards a vision reading.
-- The Groq row above predates the Level 2 questions.
+The full list is in [docs/TECHNICAL.md](docs/TECHNICAL.md#9-limitations). The main ones:
+
+- No IGES files were supplied with the datasets. The eight models were generated from the answer
+  keys (`tools/generate_iges.py`), all by one exporter, so scores on them are partly circular.
+  Tests also build models the generator never makes (exact solids, inches, rotated, NURBS,
+  several bodies, open shells, curves only).
+- A model states geometry only. Free-form features (slots, pockets, splines) are not recognised;
+  assemblies are measured per body.
+- Drawings are read as text: callouts are linked to meaning by their wording, not by leader lines.
+- A scanned drawing needs a configured vision model and the user's agreement.
+- The Groq results predate Levels 2 and 3.
 - Thousands separators in numbers (`1,000`) are not parsed by the compute engine.
 - No authentication; this is a single-tenant demo.
 
 ## Roadmap
 
-- **Level 2 (PDF drawing): done.** See [docs/PLAN_LEVEL2.md](docs/PLAN_LEVEL2.md) and ADRs
-  [0006](docs/adr/0006-source-neutral-facts.md), [0007](docs/adr/0007-deterministic-cross-check.md)
-  and [0008](docs/adr/0008-consent-before-reading-scans.md).
-- **Level 3 (IGES):** extract bounding box, hole count and diameters as facts, and extend the
-  cross-check to three sources.
+- **Level 2 (PDF drawing): done.** [docs/PLAN_LEVEL2.md](docs/PLAN_LEVEL2.md), ADRs
+  [0006](docs/adr/0006-source-neutral-facts.md), [0007](docs/adr/0007-deterministic-cross-check.md),
+  [0008](docs/adr/0008-consent-before-reading-scans.md).
+- **Level 3 (IGES): done.** [docs/PLAN_LEVEL3.md](docs/PLAN_LEVEL3.md), ADRs
+  [0009](docs/adr/0009-opencascade-in-an-isolated-worker.md),
+  [0010](docs/adr/0010-three-way-cross-check.md),
+  [0011](docs/adr/0011-measured-facts.md).
+- Next: STEP files (same kernel), slot and pocket recognition, leader-line linking on drawings,
+  authentication.
 
 ## License
 
