@@ -221,18 +221,24 @@ The web app reads `BACKEND_URL` (default `http://127.0.0.1:8000`) in its proxy r
 
 ## Evaluation
 
-`uv run cnc eval --provider <anthropic|claude_code|groq|fake>` runs 64 golden questions from
-[backend/evals/golden.jsonl](backend/evals/golden.jsonl) through the real API: 42 from Level 1 and
+`uv run cnc eval --provider <anthropic|claude_code|groq|fake>` runs 80 golden questions from
+[backend/evals/golden.jsonl](backend/evals/golden.jsonl) through the real API: 41 from Level 1,
 22 for Level 2 (drawing lookups, a title-block pointer, agreements after conversion and by
-convention, the planted disagreements, revision history, scans, part-number spellings). It scores
-status, content, cross-check verdicts, citation recall and precision, abstention, wrong answers and
-whether the answer text names its file, and writes a report to `docs/eval/`.
+convention, the planted disagreements, revision history, scans, part-number spellings) and 17 for
+Level 3 (model lookups, three-way agreements and disagreements, the tap-drill convention, stock
+fit, a scanned drawing answered from the model, a part with no model, material asked of a model).
+Expected values come from the organisers' answer keys. It scores status, content, cross-check
+verdicts, citation recall and precision, abstention, wrong answers and whether the answer text
+names its file, and writes a report to `docs/eval/`.
 
-| Provider | Passed | Level 2 | Correct abstentions | Wrong answers | Citation recall / precision | Answer names its file | Median latency |
-|---|---|---|---|---|---|---|---|
-| Claude `claude-sonnet-5-5` (via Claude Code, internal testing) | 64 / 64 | 22 / 22 | 16 / 16 | 0 | 100% / 90% | 48 / 48 | 7.1 s |
-| Offline rules (baseline, no LLM) | 56 / 64 | 19 / 22 | 16 / 16 | 6 | 87% / 88% | 47 / 47 | under 0.1 s |
-| Groq `openai/gpt-oss-120b` (fallback; Level 1 set only, run before Level 2) | 41 / 42 | n/a | 12 / 13 | 1 | 100% / 100% | n/a | 1.4 s |
+| Provider | Passed | Level 2 | Level 3 | Correct abstentions | Wrong answers | Citation recall / precision | Answer names its file | Median latency |
+|---|---|---|---|---|---|---|---|---|
+| Claude `claude-sonnet-5-5` (via Claude Code, internal testing) | 80 / 80 | 22 / 22 | 17 / 17 | 16 / 16 | 0 | 100% / 85% | 63 / 63 | 6.5 s |
+| Offline rules (baseline, no LLM) | 72 / 80 | 20 / 22 | 16 / 17 | 16 / 16 | 7 | 92% / 86% | 62 / 62 | under 0.1 s |
+| Groq `openai/gpt-oss-120b` (fallback; Level 1 set only, run before Levels 2 and 3) | 41 / 42 | n/a | n/a | 12 / 13 | 1 | 100% / 100% | n/a | 1.4 s |
+
+The Level 3 scores use models generated from the answer keys, so they are partly circular (see
+Limitations); the other-exporter cases are covered by the test suite instead.
 
 "Correct abstentions" includes the scanned-drawing questions: answering about an unread scan
 counts as a wrong answer. Every citation shown in every run was verified against its file; none

@@ -181,8 +181,9 @@ def summarise(rows: list[RowResult]) -> dict:
     with_cells = [r for r in rows if r.recall is not None and r.status in ("answered", "computed")]
     llm_rows = [r for r in rows if r.status not in ("part_not_found", "invalid_question")]
     recalls = [r.recall for r in with_cells if r.recall is not None]
-    level2 = [r for r in rows if r.category in LEVEL2]
+    # Level 3 rows (M..) reuse some Level 2 category names (revision, identity); count them once.
     level3 = [r for r in rows if r.category in LEVEL3 or r.id.startswith("M")]
+    level2 = [r for r in rows if r.category in LEVEL2 and r not in level3]
     named = [r for r in rows if r.names_file is not None]
     precisions = [r.precision for r in with_cells if r.precision is not None]
     return {

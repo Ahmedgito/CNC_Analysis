@@ -253,11 +253,18 @@ by tap drill; 2282 and 3004 after unit conversion; 2281 chamfer not modelled.
 
 ### Evaluation
 
-`uv run cnc eval --provider …` runs 80 golden questions through the real API (42 Level 1,
-22 Level 2, 16 Level 3) and scores status, content, cross-check verdicts, citation recall and
+`uv run cnc eval --provider …` runs 80 golden questions through the real API (41 Level 1,
+22 Level 2, 17 Level 3) and scores status, content, cross-check verdicts, citation recall and
 precision, abstention, wrong answers, and whether the answer text names its file. Expected
-values come from the organisers' answer keys, not from the app's output. Results are in the
-README and [docs/eval](eval).
+values come from the organisers' answer keys, not from the app's output.
+
+| Provider | Passed | Level 3 | Wrong answers | Citation recall / precision | Median latency |
+|---|---|---|---|---|---|
+| Claude (via Claude Code) | 80 / 80 | 17 / 17 | 0 | 100% / 85% | 6.5 s |
+| Offline rules, no LLM | 72 / 80 | 16 / 17 | 7 | 92% / 86% | under 0.1 s |
+
+Every citation shown in every run was verified against its file. Per-question reports are in
+[docs/eval](eval).
 
 ## 8. The interface
 
@@ -319,7 +326,7 @@ README and [docs/eval](eval).
   come from cited facts. It cannot prove the prose interprets them correctly: a fluent but wrong
   sentence built from correct citations is possible, which is why verdicts and arithmetic are
   kept in code.
-- Answers take several seconds (Claude median about 7 s); the offline engine is instant but only
+- Answers take several seconds (Claude median 6.5 s); the offline engine is instant but only
   covers common question shapes.
 
 **Product**
