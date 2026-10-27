@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AERODELTA // CNC-SENTINEL — Autonomous Aerospace Manufacturing Verification</title>
+  <title>SPEC'26 CNC Part Analysis — Technical Pitch & Architecture</title>
   
-  <!-- Typography -->
+  <!-- Typography: High legibility fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,700;1,400&family=Orbitron:wght@400;600;700;800;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
   
   <!-- Font Awesome -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -16,24 +16,26 @@
   <!-- Core CDNs -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
     :root {
-      --bg-space: #03030d;
-      --bg-panel: rgba(8, 12, 28, 0.78);
-      --bg-panel-hover: rgba(14, 22, 48, 0.9);
-      --border-cyan: rgba(0, 240, 255, 0.35);
-      --border-cyan-glow: 0 0 15px rgba(0, 240, 255, 0.5);
-      --neon-cyan: #00f0ff;
-      --electric-blue: #0066ff;
-      --laser-purple: #9d4edd;
-      --alert-amber: #ffaa00;
-      --danger-crimson: #ff2a5f;
-      --text-primary: #f0f6fc;
-      --text-muted: #8b9bb4;
-      --font-display: 'Orbitron', sans-serif;
-      --font-ui: 'Rajdhani', sans-serif;
+      /* High-contrast palette: crisp, legible, professional aerospace dark mode */
+      --bg-dark: #0a0d14;
+      --bg-panel: rgba(17, 24, 39, 0.94);
+      --bg-panel-elevated: rgba(26, 36, 56, 0.95);
+      --border-subtle: rgba(75, 85, 99, 0.45);
+      --border-accent: #00d2ff;
+      --cyan: #00e5ff;
+      --blue: #2563eb;
+      --green: #10b981;
+      --amber: #f59e0b;
+      --rose: #f43f5e;
+      --text-white: #ffffff;
+      --text-main: #f3f4f6;
+      --text-secondary: #d1d5db;
+      --text-muted: #9ca3af;
+      --font-heading: 'Space Grotesk', sans-serif;
+      --font-body: 'Inter', sans-serif;
       --font-mono: 'JetBrains Mono', monospace;
     }
 
@@ -41,17 +43,17 @@
       box-sizing: border-box;
       margin: 0;
       padding: 0;
-      user-select: none;
     }
 
     body {
-      background-color: var(--bg-space);
-      color: var(--text-primary);
-      font-family: var(--font-ui);
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: var(--font-body);
       overflow: hidden;
       height: 100vh;
       width: 100vw;
       position: relative;
+      -webkit-font-smoothing: antialiased;
     }
 
     /* 3D Background Canvas */
@@ -62,43 +64,35 @@
       width: 100vw;
       height: 100vh;
       z-index: 1;
-      pointer-events: auto;
+      opacity: 0.65;
     }
 
-    /* Scanline & HUD Grid Overlay */
-    .hud-scanline {
+    /* Subtle backdrop grid (not blinding) */
+    .bg-grid {
       position: fixed;
       inset: 0;
       pointer-events: none;
       z-index: 2;
-      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.35) 50%),
-                  linear-gradient(90deg, rgba(255, 0, 0, 0.015), rgba(0, 255, 240, 0.02), rgba(0, 0, 255, 0.015));
-      background-size: 100% 3px, 6px 100%;
-      opacity: 0.7;
+      background-image: 
+        linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
     }
 
-    .hud-vignette {
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      z-index: 2;
-      box-shadow: inset 0 0 120px rgba(0, 5, 20, 0.85);
-    }
-
-    /* Aerospace HUD Top Header */
+    /* Header Bar */
     header.hud-header {
       position: fixed;
       top: 0;
       left: 0;
       width: 100vw;
-      padding: 18px 36px;
+      padding: 16px 40px;
       z-index: 10;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      background: linear-gradient(180deg, rgba(3, 5, 18, 0.92) 0%, rgba(3, 5, 18, 0.3) 70%, transparent 100%);
-      border-bottom: 1px solid rgba(0, 240, 255, 0.15);
-      backdrop-filter: blur(8px);
+      background: rgba(10, 13, 20, 0.95);
+      border-bottom: 1px solid var(--border-subtle);
+      backdrop-filter: blur(12px);
     }
 
     .brand-group {
@@ -107,196 +101,158 @@
       gap: 16px;
     }
 
-    .brand-insignia {
-      width: 38px;
-      height: 38px;
-      border: 2px solid var(--neon-cyan);
-      transform: rotate(45deg);
+    .brand-icon {
+      width: 36px;
+      height: 36px;
+      background: var(--blue);
+      border-radius: 6px;
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: var(--border-cyan-glow);
-    }
-
-    .brand-insignia i {
-      transform: rotate(-45deg);
-      color: var(--neon-cyan);
+      color: #ffffff;
       font-size: 18px;
     }
 
     .brand-titles h1 {
-      font-family: var(--font-display);
-      font-size: 1.35rem;
-      letter-spacing: 3px;
-      color: #ffffff;
-      text-transform: uppercase;
+      font-family: var(--font-heading);
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--text-white);
+      letter-spacing: 0.5px;
       display: flex;
       align-items: center;
       gap: 10px;
     }
 
     .brand-titles h1 span {
-      color: var(--neon-cyan);
-      text-shadow: 0 0 10px var(--neon-cyan);
+      color: var(--cyan);
+      font-size: 0.95rem;
+      background: rgba(0, 229, 255, 0.12);
+      padding: 2px 8px;
+      border-radius: 4px;
+      border: 1px solid rgba(0, 229, 255, 0.3);
     }
 
     .brand-subtitle {
-      font-family: var(--font-mono);
-      font-size: 0.72rem;
-      color: var(--text-muted);
-      letter-spacing: 1.5px;
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+      font-weight: 500;
     }
 
-    .hud-telemetry-bar {
+    .header-badges {
       display: flex;
+      gap: 16px;
       align-items: center;
-      gap: 24px;
+    }
+
+    .badge {
       font-family: var(--font-mono);
       font-size: 0.78rem;
-    }
-
-    .telemetry-node {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-    }
-
-    .telemetry-label {
-      color: var(--text-muted);
-      font-size: 0.65rem;
-      letter-spacing: 1px;
-    }
-
-    .telemetry-value {
-      color: var(--neon-cyan);
-      font-weight: 700;
-      letter-spacing: 1px;
-    }
-
-    .status-badge {
-      padding: 4px 10px;
-      border-radius: 2px;
-      background: rgba(0, 240, 255, 0.1);
-      border: 1px solid var(--neon-cyan);
-      color: var(--neon-cyan);
-      font-size: 0.7rem;
-      font-weight: 700;
-      letter-spacing: 1.5px;
+      padding: 5px 12px;
+      border-radius: 4px;
+      font-weight: 600;
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 8px;
     }
 
-    .status-dot {
+    .badge-primary {
+      background: rgba(37, 99, 235, 0.2);
+      border: 1px solid rgba(37, 99, 235, 0.5);
+      color: #93c5fd;
+    }
+
+    .badge-success {
+      background: rgba(16, 185, 129, 0.2);
+      border: 1px solid rgba(16, 185, 129, 0.5);
+      color: #6ee7b7;
+    }
+
+    .badge-dot {
       width: 7px;
       height: 7px;
-      background: var(--neon-cyan);
       border-radius: 50%;
-      box-shadow: 0 0 8px var(--neon-cyan);
-      animation: pulse 1.8s infinite;
+      background: #10b981;
     }
 
-    @keyframes pulse {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.3; transform: scale(0.8); }
-    }
-
-    /* HUD Bottom Controls & Timeline Navigation */
+    /* Footer Navigation */
     footer.hud-footer {
       position: fixed;
       bottom: 0;
       left: 0;
       width: 100vw;
-      padding: 16px 36px;
+      padding: 14px 40px;
       z-index: 10;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      background: linear-gradient(0deg, rgba(3, 5, 18, 0.95) 0%, rgba(3, 5, 18, 0.4) 70%, transparent 100%);
-      border-top: 1px solid rgba(0, 240, 255, 0.15);
-      backdrop-filter: blur(8px);
+      background: rgba(10, 13, 20, 0.95);
+      border-top: 1px solid var(--border-subtle);
+      backdrop-filter: blur(12px);
     }
 
     .timeline-nav {
       display: flex;
-      gap: 12px;
+      gap: 10px;
       align-items: center;
     }
 
     .nav-pip {
-      width: 32px;
+      width: 28px;
       height: 6px;
-      background: rgba(255, 255, 255, 0.15);
-      border-radius: 1px;
+      background: rgba(156, 163, 175, 0.3);
+      border-radius: 3px;
       cursor: pointer;
-      transition: all 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
-      position: relative;
+      transition: all 0.25s ease;
     }
 
     .nav-pip.active {
-      width: 60px;
-      background: var(--neon-cyan);
-      box-shadow: 0 0 12px var(--neon-cyan);
+      width: 50px;
+      background: var(--cyan);
     }
 
     .nav-pip:hover:not(.active) {
-      background: rgba(0, 240, 255, 0.45);
+      background: rgba(156, 163, 175, 0.6);
     }
 
-    .deck-controls {
-      display: flex;
-      gap: 14px;
-    }
-
-    .btn-hud {
-      background: rgba(0, 240, 255, 0.08);
-      border: 1px solid var(--border-cyan);
-      color: var(--text-primary);
-      font-family: var(--font-display);
-      font-size: 0.78rem;
-      letter-spacing: 2px;
+    .btn {
+      font-family: var(--font-heading);
+      font-size: 0.88rem;
+      font-weight: 600;
       padding: 9px 20px;
+      border-radius: 5px;
       cursor: pointer;
-      display: flex;
+      display: inline-flex;
       align-items: center;
-      gap: 10px;
-      transition: all 0.3s ease;
-      clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
-      position: relative;
-      overflow: hidden;
+      gap: 8px;
+      transition: all 0.2s ease;
+      text-decoration: none;
+      border: 1px solid transparent;
     }
 
-    .btn-hud::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: -100%;
-      width: 100%;
-      height: 100%;
-      background: linear-gradient(90deg, transparent, rgba(0, 240, 255, 0.3), transparent);
-      transition: left 0.5s ease;
+    .btn-secondary {
+      background: #1f2937;
+      color: var(--text-white);
+      border: 1px solid #374151;
     }
 
-    .btn-hud:hover::before {
-      left: 100%;
+    .btn-secondary:hover {
+      background: #374151;
+      border-color: #4b5563;
     }
 
-    .btn-hud:hover {
-      background: rgba(0, 240, 255, 0.22);
-      border-color: var(--neon-cyan);
-      box-shadow: 0 0 15px rgba(0, 240, 255, 0.4);
-      transform: translateY(-2px);
+    .btn-primary {
+      background: var(--blue);
       color: #ffffff;
+      border-color: #3b82f6;
     }
 
-    .btn-hud-primary {
-      background: linear-gradient(135deg, rgba(0, 240, 255, 0.25), rgba(0, 102, 255, 0.35));
-      border: 1px solid var(--neon-cyan);
-      color: #ffffff;
-      box-shadow: 0 0 15px rgba(0, 240, 255, 0.25);
+    .btn-primary:hover {
+      background: #1d4ed8;
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
     }
 
-    /* Deck Slides Container */
+    /* Deck Viewport & Slides */
     #deck-viewport {
       position: relative;
       width: 100vw;
@@ -307,950 +263,808 @@
     .slide {
       position: absolute;
       inset: 0;
-      padding: 100px 60px 85px 60px;
+      padding: 95px 60px 80px 60px;
       display: flex;
       flex-direction: column;
       justify-content: center;
       opacity: 0;
       visibility: hidden;
       pointer-events: none;
-      transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
-      transform: scale(0.96) translateY(20px);
+      transition: opacity 0.4s ease, transform 0.4s ease;
+      transform: translateY(12px);
     }
 
     .slide.active {
       opacity: 1;
       visibility: visible;
       pointer-events: auto;
-      transform: scale(1) translateY(0);
+      transform: translateY(0);
     }
 
-    /* Glass Panels & Content Layouts */
-    .glass-card {
+    /* High-contrast Card Panels */
+    .panel {
       background: var(--bg-panel);
-      border: 1px solid var(--border-cyan);
-      backdrop-filter: blur(16px);
-      border-radius: 4px;
-      padding: 28px;
-      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6), inset 0 0 15px rgba(0, 240, 255, 0.05);
-      position: relative;
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 24px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
     }
 
-    .glass-card::after {
-      content: '';
-      position: absolute;
-      top: -1px;
-      left: 20px;
-      width: 40px;
-      height: 2px;
-      background: var(--neon-cyan);
-      box-shadow: 0 0 8px var(--neon-cyan);
+    .panel-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+      font-family: var(--font-heading);
+      font-size: 1.1rem;
+      color: var(--text-white);
+      font-weight: 700;
     }
 
-    .tagline-badge {
+    .slide-badge {
       display: inline-flex;
       align-items: center;
-      gap: 8px;
-      padding: 5px 14px;
-      border-radius: 2px;
-      background: rgba(0, 240, 255, 0.08);
-      border-left: 3px solid var(--neon-cyan);
+      gap: 6px;
+      padding: 4px 10px;
+      background: rgba(0, 229, 255, 0.1);
+      border: 1px solid rgba(0, 229, 255, 0.35);
+      border-radius: 4px;
+      color: var(--cyan);
       font-family: var(--font-mono);
-      font-size: 0.76rem;
-      letter-spacing: 2px;
-      color: var(--neon-cyan);
+      font-size: 0.78rem;
+      font-weight: 600;
       text-transform: uppercase;
-      margin-bottom: 14px;
-    }
-
-    .slide-title {
-      font-family: var(--font-display);
-      font-size: 2.8rem;
-      font-weight: 800;
-      letter-spacing: 2px;
-      line-height: 1.15;
-      text-transform: uppercase;
-      margin-bottom: 14px;
-      background: linear-gradient(135deg, #ffffff 40%, var(--neon-cyan) 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-
-    .slide-desc {
-      font-size: 1.15rem;
-      color: var(--text-muted);
-      line-height: 1.55;
-      max-width: 650px;
-      margin-bottom: 24px;
-    }
-
-    /* SLIDE 1: Title / Mission Control */
-    .title-grid {
-      display: grid;
-      grid-template-columns: 1.2fr 0.8fr;
-      align-items: center;
-      gap: 40px;
-      max-width: 1400px;
-      margin: 0 auto;
-      width: 100%;
-    }
-
-    .hero-stat-row {
-      display: flex;
-      gap: 24px;
-      margin-top: 28px;
-    }
-
-    .hero-stat-box {
-      border-left: 2px solid var(--neon-cyan);
-      padding-left: 14px;
-    }
-
-    .hero-stat-box .val {
-      font-family: var(--font-display);
-      font-size: 1.8rem;
-      font-weight: 700;
-      color: #ffffff;
-    }
-
-    .hero-stat-box .lbl {
-      font-family: var(--font-mono);
-      font-size: 0.72rem;
-      color: var(--text-muted);
-      letter-spacing: 1px;
-    }
-
-    .suparco-seal-card {
-      text-align: center;
-      padding: 36px;
-      border: 1px solid rgba(0, 240, 255, 0.2);
-    }
-
-    .seal-orbit-anim {
-      width: 140px;
-      height: 140px;
-      margin: 0 auto 20px auto;
-      position: relative;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .seal-ring-1 {
-      position: absolute;
-      inset: 0;
-      border: 2px dashed rgba(0, 240, 255, 0.4);
-      border-radius: 50%;
-      animation: spin 24s linear infinite;
-    }
-
-    .seal-ring-2 {
-      position: absolute;
-      inset: 15px;
-      border: 2px solid rgba(0, 102, 255, 0.5);
-      border-top-color: transparent;
-      border-radius: 50%;
-      animation: spin 14s linear infinite reverse;
-    }
-
-    @keyframes spin {
-      100% { transform: rotate(360deg); }
-    }
-
-    .seal-core {
-      font-size: 42px;
-      color: var(--neon-cyan);
-      text-shadow: 0 0 20px var(--neon-cyan);
-    }
-
-    /* SLIDE 2: Problem Statement */
-    .problem-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 24px;
-      max-width: 1400px;
-      margin: 0 auto;
-      width: 100%;
-    }
-
-    .problem-card {
-      transition: transform 0.3s ease, border-color 0.3s ease;
-    }
-
-    .problem-card:hover {
-      transform: translateY(-6px);
-      border-color: var(--danger-crimson);
-      box-shadow: 0 10px 30px rgba(255, 42, 95, 0.15);
-    }
-
-    .problem-icon {
-      font-size: 2rem;
-      color: var(--danger-crimson);
-      margin-bottom: 16px;
-      text-shadow: 0 0 12px rgba(255, 42, 95, 0.6);
-    }
-
-    .problem-card h3 {
-      font-family: var(--font-display);
-      font-size: 1.15rem;
-      color: #ffffff;
-      margin-bottom: 10px;
-      letter-spacing: 1px;
-    }
-
-    .problem-card p {
-      font-size: 0.95rem;
-      color: var(--text-muted);
-      line-height: 1.5;
-    }
-
-    .disaster-tag {
-      margin-top: 14px;
-      display: inline-block;
-      font-family: var(--font-mono);
-      font-size: 0.7rem;
-      padding: 3px 8px;
-      background: rgba(255, 42, 95, 0.15);
-      border: 1px solid rgba(255, 42, 95, 0.4);
-      color: #ff7597;
-    }
-
-    /* SLIDE 3: Architecture & Payload */
-    .arch-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 32px;
-      max-width: 1400px;
-      margin: 0 auto;
-      width: 100%;
-    }
-
-    .flow-step {
-      display: flex;
-      gap: 16px;
-      margin-bottom: 18px;
-      padding: 14px;
-      background: rgba(255, 255, 255, 0.02);
-      border: 1px solid rgba(0, 240, 255, 0.1);
-      border-radius: 2px;
-      transition: all 0.3s ease;
-    }
-
-    .flow-step:hover {
-      background: rgba(0, 240, 255, 0.08);
-      border-color: var(--neon-cyan);
-    }
-
-    .flow-num {
-      font-family: var(--font-display);
-      font-size: 1.3rem;
-      font-weight: 800;
-      color: var(--neon-cyan);
-      min-width: 32px;
-    }
-
-    .flow-info h4 {
-      font-family: var(--font-display);
-      font-size: 0.95rem;
-      color: #ffffff;
-      margin-bottom: 4px;
-    }
-
-    .flow-info p {
-      font-size: 0.88rem;
-      color: var(--text-muted);
-      line-height: 1.4;
-    }
-
-    .flow-badge {
-      font-family: var(--font-mono);
-      font-size: 0.68rem;
-      color: var(--neon-cyan);
-      background: rgba(0, 240, 255, 0.1);
-      padding: 2px 6px;
-      display: inline-block;
-      margin-top: 5px;
-    }
-
-    /* 3D Model HUD Controls on Slide 3 */
-    .interactive-model-hud {
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-    }
-
-    .cad-target-card {
-      border: 1px dashed var(--border-cyan);
-      padding: 16px;
-      margin-bottom: 14px;
-      background: rgba(0, 15, 30, 0.4);
-    }
-
-    .cad-target-card .title {
-      font-family: var(--font-mono);
-      font-size: 0.75rem;
-      color: var(--neon-cyan);
-      display: flex;
-      justify-content: space-between;
-    }
-
-    .cad-meta-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-      margin-top: 10px;
-      font-family: var(--font-mono);
-      font-size: 0.72rem;
-    }
-
-    .cad-meta-grid div {
-      color: var(--text-muted);
-    }
-
-    .cad-meta-grid div span {
-      color: #ffffff;
-      font-weight: 700;
-    }
-
-    /* SLIDE 4: Telemetry Dashboard & Metrics */
-    .telemetry-grid {
-      display: grid;
-      grid-template-columns: 1.1fr 0.9fr;
-      gap: 32px;
-      max-width: 1400px;
-      margin: 0 auto;
-      width: 100%;
-    }
-
-    .metric-tiles-row {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 16px;
-      margin-bottom: 20px;
-    }
-
-    .metric-tile {
-      background: rgba(0, 240, 255, 0.04);
-      border: 1px solid rgba(0, 240, 255, 0.2);
-      padding: 16px;
-      border-radius: 3px;
-    }
-
-    .metric-tile .num {
-      font-family: var(--font-display);
-      font-size: 1.8rem;
-      font-weight: 800;
-      color: var(--neon-cyan);
-    }
-
-    .metric-tile .desc {
-      font-family: var(--font-mono);
-      font-size: 0.7rem;
-      color: var(--text-muted);
-      margin-top: 4px;
-      letter-spacing: 0.5px;
-    }
-
-    .chart-container-box {
-      height: 250px;
-      position: relative;
-    }
-
-    /* SLIDE 5: Flight Plan / Roadmap */
-    .flightplan-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 20px;
-      max-width: 1400px;
-      margin: 0 auto;
-      width: 100%;
-    }
-
-    .flight-phase-card {
-      border-top: 3px solid var(--electric-blue);
-      position: relative;
-      transition: all 0.3s ease;
-    }
-
-    .flight-phase-card.active-phase {
-      border-top-color: var(--neon-cyan);
-      box-shadow: 0 0 25px rgba(0, 240, 255, 0.15);
-    }
-
-    .phase-badge {
-      font-family: var(--font-mono);
-      font-size: 0.72rem;
-      color: var(--neon-cyan);
-      margin-bottom: 10px;
-    }
-
-    .flight-phase-card h3 {
-      font-family: var(--font-display);
-      font-size: 1.1rem;
-      color: #ffffff;
       margin-bottom: 12px;
     }
 
-    .flight-phase-card ul {
-      list-style: none;
-      font-size: 0.88rem;
-      color: var(--text-muted);
-      line-height: 1.6;
+    .slide-title {
+      font-family: var(--font-heading);
+      font-size: 2.4rem;
+      font-weight: 700;
+      color: var(--text-white);
+      line-height: 1.2;
+      margin-bottom: 12px;
     }
 
-    .flight-phase-card ul li {
-      position: relative;
-      padding-left: 14px;
-      margin-bottom: 6px;
+    .slide-subtitle {
+      font-size: 1.1rem;
+      color: var(--text-secondary);
+      line-height: 1.5;
+      max-width: 760px;
+      margin-bottom: 24px;
     }
 
-    .flight-phase-card ul li::before {
-      content: '▹';
-      position: absolute;
-      left: 0;
-      color: var(--neon-cyan);
-    }
-
-    /* SLIDE 6: Transmission End / Call to Action */
-    .cta-container {
-      max-width: 1000px;
+    /* SLIDE 1: Title */
+    .title-layout {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 40px;
+      max-width: 1350px;
       margin: 0 auto;
       width: 100%;
-      text-align: center;
+      align-items: center;
     }
 
-    .cta-summary-card {
-      padding: 44px;
-      margin-bottom: 28px;
+    .highlight-list {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-top: 28px;
     }
 
-    .cta-title {
-      font-family: var(--font-display);
-      font-size: 2.2rem;
-      font-weight: 800;
-      margin-bottom: 16px;
-      color: #ffffff;
+    .highlight-item {
+      background: var(--bg-panel-elevated);
+      border: 1px solid var(--border-subtle);
+      border-left: 3px solid var(--cyan);
+      border-radius: 6px;
+      padding: 16px;
     }
 
-    .team-lineup {
-      display: flex;
-      justify-content: center;
-      gap: 36px;
-      margin: 28px 0;
+    .highlight-item .val {
+      font-family: var(--font-heading);
+      font-size: 1.45rem;
+      font-weight: 700;
+      color: var(--text-white);
+      margin-bottom: 4px;
     }
 
-    .team-member-chip {
+    .highlight-item .lbl {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+
+    /* SLIDE 2: Problem Statement */
+    .tri-source-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+      max-width: 1350px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .source-card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 22px;
       display: flex;
       flex-direction: column;
-      align-items: center;
-      gap: 6px;
+      justify-content: space-between;
     }
 
-    .member-avatar {
-      width: 52px;
-      height: 52px;
-      border: 2px solid var(--border-cyan);
-      border-radius: 50%;
+    .source-card-top {
+      margin-bottom: 16px;
+    }
+
+    .source-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 6px;
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 20px;
-      color: var(--neon-cyan);
-      background: rgba(0, 240, 255, 0.05);
-      box-shadow: 0 0 10px rgba(0, 240, 255, 0.2);
+      margin-bottom: 14px;
     }
 
-    .member-name {
-      font-family: var(--font-display);
-      font-size: 0.9rem;
-      color: #ffffff;
+    .icon-excel { background: rgba(16, 185, 129, 0.15); color: #34d399; }
+    .icon-cad { background: rgba(0, 229, 255, 0.15); color: var(--cyan); }
+    .icon-pdf { background: rgba(244, 63, 94, 0.15); color: #fb7185; }
+
+    .source-card h3 {
+      font-family: var(--font-heading);
+      font-size: 1.15rem;
+      color: var(--text-white);
+      margin-bottom: 8px;
     }
 
-    .member-role {
+    .source-card p {
+      font-size: 0.92rem;
+      color: var(--text-secondary);
+      line-height: 1.45;
+    }
+
+    .source-footer-pill {
       font-family: var(--font-mono);
-      font-size: 0.7rem;
-      color: var(--text-muted);
+      font-size: 0.74rem;
+      padding: 6px 10px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: var(--text-secondary);
+      margin-top: 14px;
     }
 
-    .live-command-terminal {
-      background: #020208;
-      border: 1px solid rgba(0, 240, 255, 0.25);
+    /* SLIDE 3: Architecture */
+    .arch-layout {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 30px;
+      max-width: 1350px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .stack-step {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
       padding: 16px;
-      font-family: var(--font-mono);
-      font-size: 0.8rem;
-      text-align: left;
-      color: #00ffaa;
-      border-radius: 3px;
-      max-width: 600px;
-      margin: 0 auto 20px auto;
-      box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.8);
+      margin-bottom: 12px;
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
     }
 
-    /* 3D Model Selector Buttons */
-    .model-switch-panel {
+    .step-badge {
+      background: var(--blue);
+      color: #ffffff;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 4px;
+      min-width: 42px;
+      text-align: center;
+    }
+
+    .step-content h4 {
+      font-family: var(--font-heading);
+      font-size: 1rem;
+      color: var(--text-white);
+      margin-bottom: 4px;
+    }
+
+    .step-content p {
+      font-size: 0.88rem;
+      color: var(--text-secondary);
+      line-height: 1.4;
+    }
+
+    .step-tech {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--cyan);
+      margin-top: 6px;
+    }
+
+    /* SLIDE 4: Test Suite & Verified Cases */
+    .case-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 18px;
+      max-width: 1350px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .case-card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      padding: 18px;
+    }
+
+    .case-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .case-title {
+      font-family: var(--font-heading);
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text-white);
+    }
+
+    .status-tag {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 3px;
+    }
+
+    .tag-flag { background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.4); }
+    .tag-match { background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.4); }
+    .tag-missing { background: rgba(244, 63, 94, 0.15); color: #f43f5e; border: 1px solid rgba(244, 63, 94, 0.4); }
+    .tag-unit { background: rgba(0, 229, 255, 0.15); color: var(--cyan); border: 1px solid rgba(0, 229, 255, 0.4); }
+
+    .case-body {
+      font-size: 0.88rem;
+      color: var(--text-secondary);
+      line-height: 1.45;
+    }
+
+    .case-evidence {
+      margin-top: 10px;
+      padding: 8px 12px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 4px;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: #93c5fd;
+    }
+
+    /* SLIDE 5: Evaluation & Rigor */
+    .eval-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      max-width: 1350px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .eval-stat-box {
+      background: var(--bg-panel-elevated);
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      padding: 18px;
+      margin-bottom: 12px;
+    }
+
+    .eval-stat-box .title {
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: var(--cyan);
+      margin-bottom: 6px;
+      font-weight: 600;
+    }
+
+    .eval-stat-box .desc {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      line-height: 1.4;
+    }
+
+    /* SLIDE 6: Live Demo & Submission */
+    .demo-layout {
+      max-width: 900px;
+      margin: 0 auto;
+      width: 100%;
+      text-align: center;
+    }
+
+    .terminal-box {
+      background: #060910;
+      border: 1px solid #1f2937;
+      border-radius: 6px;
+      padding: 20px;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      color: #34d399;
+      text-align: left;
+      margin: 20px auto;
+      box-shadow: inset 0 0 15px rgba(0,0,0,0.8);
+      line-height: 1.6;
+    }
+
+    .model-selector-bar {
       position: fixed;
-      right: 36px;
+      right: 40px;
       top: 50%;
       transform: translateY(-50%);
       z-index: 15;
       display: flex;
       flex-direction: column;
-      gap: 10px;
-      background: rgba(5, 10, 25, 0.7);
-      border: 1px solid var(--border-cyan);
-      padding: 12px;
-      border-radius: 4px;
-      backdrop-filter: blur(10px);
-    }
-
-    .model-switch-btn {
-      background: transparent;
-      border: 1px solid rgba(0, 240, 255, 0.2);
-      color: var(--text-muted);
-      font-family: var(--font-mono);
-      font-size: 0.68rem;
-      padding: 8px 12px;
-      cursor: pointer;
-      border-radius: 2px;
-      transition: all 0.25s ease;
-      display: flex;
-      align-items: center;
       gap: 8px;
+      background: rgba(17, 24, 39, 0.9);
+      border: 1px solid var(--border-subtle);
+      padding: 10px;
+      border-radius: 6px;
     }
 
-    .model-switch-btn.active, .model-switch-btn:hover {
+    .model-btn {
+      background: transparent;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: var(--text-secondary);
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      padding: 6px 12px;
+      cursor: pointer;
+      border-radius: 4px;
+      transition: all 0.2s ease;
+      text-align: left;
+    }
+
+    .model-btn.active, .model-btn:hover {
+      background: var(--blue);
+      border-color: #3b82f6;
       color: #ffffff;
-      background: rgba(0, 240, 255, 0.2);
-      border-color: var(--neon-cyan);
-      box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
     }
 
-    /* Responsive adjustments */
     @media (max-width: 1024px) {
-      .title-grid, .arch-grid, .telemetry-grid { grid-template-columns: 1fr; }
-      .problem-grid, .flightplan-grid { grid-template-columns: 1fr 1fr; }
-      .slide { padding: 90px 30px 80px 30px; }
-      .model-switch-panel { display: none; }
+      .title-layout, .arch-layout, .case-grid, .eval-layout { grid-template-columns: 1fr; }
+      .tri-source-grid { grid-template-columns: 1fr; }
+      .slide { padding: 90px 24px 75px 24px; }
+      .model-selector-bar { display: none; }
     }
   </style>
 </head>
 <body>
 
-  <!-- WebGL Background Canvas -->
+  <!-- WebGL 3D Canvas -->
   <canvas id="webgl-canvas"></canvas>
+  <div class="bg-grid"></div>
 
-  <!-- High-Tech HUD Overlays -->
-  <div class="hud-scanline"></div>
-  <div class="hud-vignette"></div>
-
-  <!-- Header Command Bar -->
+  <!-- Header -->
   <header class="hud-header">
     <div class="brand-group">
-      <div class="brand-insignia">
-        <i class="fa-solid fa-satellite"></i>
+      <div class="brand-icon">
+        <i class="fa-solid fa-microchip"></i>
       </div>
       <div class="brand-titles">
-        <h1>CNC-SENTINEL <span>// AERODELTA</span></h1>
-        <div class="brand-subtitle">MISSION-CRITICAL AEROSPACE MANUFACTURING INTELLIGENCE</div>
+        <h1>CNC PART ANALYZER <span>SPEC'26</span></h1>
+        <div class="brand-subtitle">LLM-Based Multi-Source Engineering Verification System</div>
       </div>
     </div>
 
-    <div class="hud-telemetry-bar">
-      <div class="telemetry-node">
-        <span class="telemetry-label">AGENCY TARGET</span>
-        <span class="telemetry-value">SUPARCO / PRSS / PakSAT</span>
+    <div class="header-badges">
+      <div class="badge badge-primary">
+        <i class="fa-solid fa-layer-group"></i> LEVEL 3 COMPLETE
       </div>
-      <div class="telemetry-node">
-        <span class="telemetry-label">SYSTEM TIME (UTC)</span>
-        <span class="telemetry-value" id="hud-clock">00:00:00.000</span>
-      </div>
-      <div class="status-badge">
-        <div class="status-dot"></div>
-        LEVEL 3 + STRETCH ACTIVE
+      <div class="badge badge-success">
+        <div class="badge-dot"></div> STRETCH GOAL ENABLED
       </div>
     </div>
   </header>
 
-  <!-- 3D Model Showcase Switcher (Right Rail) -->
-  <div class="model-switch-panel">
-    <div style="font-family: var(--font-mono); font-size: 0.6rem; color: var(--neon-cyan); letter-spacing: 1px; margin-bottom: 4px;">
-      CAD TELEMETRY
+  <!-- 3D Model Quick Switcher -->
+  <div class="model-selector-bar">
+    <div style="font-family: var(--font-mono); font-size: 0.65rem; color: var(--text-muted); margin-bottom: 4px; font-weight: 700;">
+      3D PART MODEL
     </div>
-    <button class="model-switch-btn active" onclick="switchModel('satellite')">
-      <i class="fa-solid fa-satellite-dish"></i> SAT PAYLOAD
+    <button class="model-btn active" onclick="loadModel('flange')">
+      <i class="fa-solid fa-circle-notch"></i> Part 2280 (Flange)
     </button>
-    <button class="model-switch-btn" onclick="switchModel('gimbal')">
-      <i class="fa-solid fa-arrows-spin"></i> GIMBAL PIVOT
+    <button class="model-btn" onclick="loadModel('shaft')">
+      <i class="fa-solid fa-bars"></i> Part 2281 (Shaft)
     </button>
-    <button class="model-switch-btn" onclick="switchModel('flange')">
-      <i class="fa-solid fa-circle-notch"></i> FLANGE 2280
+    <button class="model-btn" onclick="loadModel('bushing')">
+      <i class="fa-solid fa-ring"></i> Part 2283 (Bushing)
     </button>
-    <button class="model-switch-btn" onclick="toggleWireframe()">
-      <i class="fa-solid fa-vector-square"></i> WIREFRAME
+    <button class="model-btn" onclick="toggleWireframe()">
+      <i class="fa-solid fa-border-all"></i> Wireframe
     </button>
   </div>
 
-  <!-- Deck Slides Viewport -->
+  <!-- Main Slides Viewport -->
   <main id="deck-viewport">
 
-    <!-- SLIDE 1: Mission Control (Title) -->
+    <!-- SLIDE 1: Title & Challenge Brief -->
     <section class="slide active" id="slide-1">
-      <div class="title-grid">
-        <div class="title-left">
-          <div class="tagline-badge">
-            <i class="fa-solid fa-shield-halved"></i> AEROSPACE PRECISION VERIFICATION
+      <div class="title-layout">
+        <div>
+          <div class="slide-badge">
+            <i class="fa-solid fa-award"></i> SPEC'26 AI Problem · NED University
           </div>
-          <h2 class="slide-title">AUTONOMOUS MULTI-SOURCE CNC PART INTELLIGENCE</h2>
-          <p class="slide-desc">
-            Bridging 3D IGES/STEP CAD models, GD&T engineering drawings, and manufacturing execution records into an infallible, zero-hallucination inspection engine for satellite payloads.
+          <h2 class="slide-title">AUTONOMOUS MULTI-SOURCE CNC PART ANALYSIS</h2>
+          <p class="slide-subtitle">
+            A production-ready system that accepts any part number, ingests disparate manufacturing records, 2D PDF engineering drawings, and 3D CAD models, and delivers mathematically grounded, citation-backed answers.
           </p>
-          <div style="display: flex; gap: 16px;">
-            <button class="btn-hud btn-hud-primary" onclick="goToSlide(1)">
-              <i class="fa-solid fa-rocket"></i> INITIATE MISSION BRIEFING
-            </button>
-            <button class="btn-hud" onclick="switchModel('satellite');">
-              <i class="fa-solid fa-cube"></i> INSPECT 3D PAYLOAD
-            </button>
-          </div>
           
-          <div class="hero-stat-row">
-            <div class="hero-stat-box">
-              <div class="val" id="stat-latency">12<span style="font-size: 1rem; color: var(--neon-cyan);">ms</span></div>
-              <div class="lbl">CROSS-CHECK SPEED</div>
+          <div style="display: flex; gap: 14px; margin-top: 20px;">
+            <button class="btn btn-primary" onclick="goToSlide(1)">
+              <i class="fa-solid fa-play"></i> Explore Problem & Solution
+            </button>
+            <button class="btn btn-secondary" onclick="goToSlide(3)">
+              <i class="fa-solid fa-check-double"></i> View Test Results
+            </button>
+          </div>
+
+          <div class="highlight-list">
+            <div class="highlight-item">
+              <div class="val">Tri-Source</div>
+              <div class="lbl">Excel + PDF + 3D IGES/STEP</div>
             </div>
-            <div class="hero-stat-box">
-              <div class="val">100<span style="font-size: 1rem; color: var(--neon-cyan);">%</span></div>
-              <div class="lbl">GROUNDED CITATIONS</div>
+            <div class="highlight-item">
+              <div class="val">Zero Guessing</div>
+              <div class="lbl">Missing info flagged as Not Found</div>
             </div>
-            <div class="hero-stat-box">
-              <div class="val">0.00<span style="font-size: 1rem; color: var(--neon-cyan);">%</span></div>
-              <div class="lbl">HALLUCINATION TOLERANCE</div>
+            <div class="highlight-item">
+              <div class="val">100% Citing</div>
+              <div class="lbl">Every claim cites exact source file</div>
             </div>
           </div>
         </div>
 
-        <div class="title-right">
-          <div class="glass-card suparco-seal-card">
-            <div class="seal-orbit-anim">
-              <div class="seal-ring-1"></div>
-              <div class="seal-ring-2"></div>
-              <div class="seal-core">
-                <i class="fa-solid fa-shuttle-space"></i>
-              </div>
+        <div>
+          <div class="panel">
+            <div class="panel-header">
+              <i class="fa-solid fa-list-check" style="color: var(--cyan);"></i>
+              Deliverables Status
             </div>
-            <h3 style="font-family: var(--font-display); font-size: 1.25rem; color: #ffffff; letter-spacing: 2px;">
-              SUPARCO SPEC'26
-            </h3>
-            <p style="font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-muted); margin-top: 6px;">
-              DEFENSE & SPACE SATELLITE FABRICATION BENCHMARK
-            </p>
-            <div style="margin-top: 18px; padding-top: 14px; border-top: 1px solid rgba(0, 240, 255, 0.15); font-family: var(--font-mono); font-size: 0.72rem; color: var(--neon-cyan);">
-              TARGET: FLIGHT HARDWARE REJECTION PREVENTION
-            </div>
+            <ul style="list-style: none; font-size: 0.92rem; color: var(--text-secondary); line-height: 2;">
+              <li><i class="fa-solid fa-check" style="color: #10b981; margin-right: 8px;"></i> <strong>Level 1: Core</strong> — Schema-agnostic Excel ingestion</li>
+              <li><i class="fa-solid fa-check" style="color: #10b981; margin-right: 8px;"></i> <strong>Level 2: Drawing</strong> — PDF drawing & title block parser</li>
+              <li><i class="fa-solid fa-check" style="color: #10b981; margin-right: 8px;"></i> <strong>Level 3: 3D Model</strong> — OpenCascade IGES/STEP geometry</li>
+              <li><i class="fa-solid fa-check" style="color: #10b981; margin-right: 8px;"></i> <strong>Stretch Goal</strong> — Works across any part number</li>
+              <li><i class="fa-solid fa-check" style="color: #10b981; margin-right: 8px;"></i> <strong>Stack</strong> — FastAPI + Next.js 16 + PostgreSQL</li>
+            </ul>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- SLIDE 2: The Orbital Dilemma / Problem Statement -->
+    <!-- SLIDE 2: The Challenge & 3 Data Sources -->
     <section class="slide" id="slide-2">
-      <div style="max-width: 1400px; margin: 0 auto; width: 100%;">
-        <div class="tagline-badge">
-          <i class="fa-solid fa-triangle-exclamation"></i> CRITICAL VULNERABILITY IN SPACE MANUFACTURING
+      <div style="max-width: 1350px; margin: 0 auto; width: 100%;">
+        <div class="slide-badge">
+          <i class="fa-solid fa-database"></i> The Problem
         </div>
-        <h2 class="slide-title">THE TRI-SOURCE SILENT FAILURE CRISIS</h2>
-        <p class="slide-desc">
-          In space systems, a 0.2 mm mismatch or an undetected revision disparity causes satellite deployment failures, launch delays, and multi-million dollar payload write-offs.
+        <h2 class="slide-title">CNC Manufacturing Information is Scattered</h2>
+        <p class="slide-subtitle">
+          Engineers waste hours hunting across three incompatible formats. Our system automates cross-validation and detects silent flaws before machining begins.
         </p>
 
-        <div class="problem-grid">
-          <div class="glass-card problem-card">
-            <div class="problem-icon"><i class="fa-solid fa-file-excel"></i></div>
-            <h3>Tri-Source Fragmentation</h3>
-            <p>
-              Critical manufacturing parameters are split across Excel job cards, PDF technical drawings, and 3D CAD files. Engineers spend 40+ hours manually cross-checking dimensions and hole counts.
-            </p>
-            <div class="disaster-tag">RISK: MISSED ANOMALIES</div>
+        <div class="tri-source-grid">
+          <div class="source-card">
+            <div class="source-card-top">
+              <div class="source-icon icon-excel">
+                <i class="fa-solid fa-file-excel"></i>
+              </div>
+              <h3>1. Excel Manufacturing Record</h3>
+              <p>Contains stock size, finished dimensions, machine assignments, operation setup/run times, tooling, and lot quantities.</p>
+            </div>
+            <div class="source-footer-pill">
+              Challenge: Banners, merged cells, varying column headers
+            </div>
           </div>
 
-          <div class="glass-card problem-card">
-            <div class="problem-icon"><i class="fa-solid fa-shuffle"></i></div>
-            <h3>Silent Revision Drift</h3>
-            <p>
-              Workshops manufacture from stale Excel sheets (e.g. Rev A bore Ø18) while engineering releases Rev B (Ø20). Like Part 3002, silent revision desynchronization causes scrap parts.
-            </p>
-            <div class="disaster-tag">RISK: PAYLOAD FIT DISASTERS</div>
+          <div class="source-card">
+            <div class="source-card-top">
+              <div class="source-icon icon-pdf">
+                <i class="fa-solid fa-file-pdf"></i>
+              </div>
+              <h3>2. PDF Engineering Drawing</h3>
+              <p>Specifies nominal tolerances, title blocks, revision histories, material callout notes, and GD&T dimensioning.</p>
+            </div>
+            <div class="source-footer-pill">
+              Challenge: Inch vs mm, rotated text, scanned image PDFs
+            </div>
           </div>
 
-          <div class="glass-card problem-card">
-            <div class="problem-icon"><i class="fa-solid fa-scale-unbalanced"></i></div>
-            <h3>Imperial vs Metric Slips</h3>
-            <p>
-              NASA's Mars Climate Orbiter was lost due to an inch-pound to metric conversion error ($327M loss). Space parts (like Part 2282 and 3004) often mix inches and millimeters without unified validation.
-            </p>
-            <div class="disaster-tag">HISTORICAL LESSON: MCO LOSS</div>
+          <div class="source-card">
+            <div class="source-card-top">
+              <div class="source-icon icon-cad">
+                <i class="fa-solid fa-cube"></i>
+              </div>
+              <h3>3. 3D Model (IGES / STEP)</h3>
+              <p>Defines true mathematical 3D boundary representation (B-Rep): oriented bounding box, hole diameters, and cylinder counts.</p>
+            </div>
+            <div class="source-footer-pill">
+              Challenge: Multi-body solids, surface-only files, off-axis holes
+            </div>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- SLIDE 3: The Payload / Our Architecture -->
+    <!-- SLIDE 3: Architecture & Tech Stack -->
     <section class="slide" id="slide-3">
-      <div class="arch-grid">
-        <div class="arch-left">
-          <div class="tagline-badge">
-            <i class="fa-solid fa-microchip"></i> SYSTEM ARCHITECTURE
+      <div class="arch-layout">
+        <div>
+          <div class="slide-badge">
+            <i class="fa-solid fa-sitemap"></i> System Architecture
           </div>
-          <h2 class="slide-title" style="font-size: 2.2rem;">THE TRI-PILLAR VERIFIED ENGINE</h2>
-          <p class="slide-desc" style="font-size: 1rem; margin-bottom: 20px;">
-            A deterministic, mathematical ingestion core that feeds verified geometry and textual evidence into an LLM with strict citation lock.
+          <h2 class="slide-title" style="font-size: 2.1rem;">Deterministic Geometry + Verified LLM</h2>
+          <p class="slide-subtitle" style="font-size: 1rem; margin-bottom: 16px;">
+            We do not ask the LLM to hallucinate measurements. All geometry and table facts are extracted deterministically with Python and passed as strict verifiable context.
           </p>
 
-          <div class="flow-step">
-            <div class="flow-num">01</div>
-            <div class="flow-info">
-              <h4>Schema-Agnostic Excel Pipeline</h4>
-              <p>Autonomous tabular ingestion parsing banners, merged cells, and text/numeric part keys without hardcoded schemas.</p>
-              <span class="flow-badge">DIRTY EXCEL TOLERANT</span>
+          <div class="stack-step">
+            <div class="step-badge">INGEST</div>
+            <div class="step-content">
+              <h4>Schema-Agnostic Table Extraction</h4>
+              <p>Autonomous header sniffing and row alignment. Handles banner offsets (Job Cards B), numeric/text part codes, and multi-sheet workbooks.</p>
+              <span class="step-tech">Python · OpenPyXL · Canonical Column Mapping</span>
             </div>
           </div>
 
-          <div class="flow-step">
-            <div class="flow-num">02</div>
-            <div class="flow-info">
-              <h4>Native OpenCascade 3D Geometry Core</h4>
-              <p>Direct B-Rep analysis of IGES and STEP files extracting oriented envelopes, hole counts, PCD, and bore diameters.</p>
-              <span class="flow-badge">TRUE TOPOLOGICAL EDGES</span>
+          <div class="stack-step">
+            <div class="step-badge">CAD</div>
+            <div class="step-content">
+              <h4>OpenCascade (OCP) 3D B-Rep Kernel</h4>
+              <p>Measures exact oriented bounding boxes (OBB), groups cylindrical surfaces by axis to detect holes vs bosses, and computes true solid volume.</p>
+              <span class="step-tech">OpenCascade · Build123d · IGESControl & STEPControl</span>
             </div>
           </div>
 
-          <div class="flow-step">
-            <div class="flow-num">03</div>
-            <div class="flow-info">
-              <h4>Strict Evidence-Grounded LLM Gate</h4>
-              <p>If evidence is missing, the system outputs "NOT FOUND" instead of guessing. Cross-checks and flags mismatches with exact citations.</p>
-              <span class="flow-badge">ZERO REASONING DRIFT</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="arch-right interactive-model-hud">
-          <div class="glass-card">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-              <span style="font-family: var(--font-display); font-size: 0.9rem; color: #ffffff;">LIVE DISCREPANCY DETECTOR</span>
-              <span class="status-badge" style="border-color: var(--alert-amber); color: var(--alert-amber); background: rgba(255, 170, 0, 0.1);">
-                <i class="fa-solid fa-triangle-exclamation"></i> MISMATCH FLAGGED
-              </span>
-            </div>
-
-            <div class="cad-target-card">
-              <div class="title">
-                <span>TARGET: PART 2283 / 9005</span>
-                <span>STATUS: VERIFIED</span>
-              </div>
-              <div class="cad-meta-grid">
-                <div>EXCEL CARD: <span>4 x Ø20 mm</span></div>
-                <div>CAD MODEL: <span style="color: var(--danger-crimson);">4 x Ø25 mm</span></div>
-                <div>DRAWING: <span style="color: var(--danger-crimson);">Ø25.0 ± 0.05</span></div>
-                <div>VERDICT: <span style="color: var(--alert-amber);">FLAGGED MISMATCH</span></div>
-              </div>
-            </div>
-
-            <p style="font-family: var(--font-mono); font-size: 0.74rem; color: var(--text-muted); line-height: 1.45;">
-              "The system detected that Excel cell B4 claims 4 x Ø20 holes, whereas 3D IGES model entity #186 and drawing PDF note 2 confirm Ø25.0 mm holes. Discrepancy successfully quarantined."
-            </p>
-          </div>
-
-          <div class="glass-card" style="margin-top: 16px;">
-            <div style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--neon-cyan); margin-bottom: 8px;">
-              INTERACTIVE CAD ROTATION
-            </div>
-            <p style="font-size: 0.84rem; color: var(--text-muted);">
-              Use your mouse or trackpad to freely rotate, inspect, and pan the live satellite payload geometry rendered in Three.js in real time.
-            </p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- SLIDE 4: Telemetry & Impact (Data Dashboard) -->
-    <section class="slide" id="slide-4">
-      <div class="telemetry-grid">
-        <div class="telemetry-left">
-          <div class="tagline-badge">
-            <i class="fa-solid fa-chart-line"></i> QUANTIFIABLE FLIGHT READINESS METRICS
-          </div>
-          <h2 class="slide-title" style="font-size: 2.2rem;">TELEMETRY & IMPACT DASHBOARD</h2>
-          <p class="slide-desc" style="font-size: 1rem; margin-bottom: 16px;">
-            Benchmarked against both the clean synthetic test suites and 8 real-world aerospace GrabCAD assemblies (9001 - 9008).
-          </p>
-
-          <div class="metric-tiles-row">
-            <div class="metric-tile">
-              <div class="num" id="counter-speed">97.5%</div>
-              <div class="desc">INSPECTION TIME REDUCTION</div>
-            </div>
-            <div class="metric-tile">
-              <div class="num" id="counter-accuracy">99.8%</div>
-              <div class="desc">MISMATCH CAPTURE RATE</div>
-            </div>
-            <div class="metric-tile">
-              <div class="num" id="counter-citations">100%</div>
-              <div class="desc">VERIFIED CELL CITATIONS</div>
-            </div>
-          </div>
-
-          <div class="glass-card" style="padding: 20px;">
-            <div style="font-family: var(--font-display); font-size: 0.95rem; color: #ffffff; margin-bottom: 10px;">
-              INSPECTION LATENCY: MANUAL VS CNC-SENTINEL
-            </div>
-            <div class="chart-container-box">
-              <canvas id="telemetryChart"></canvas>
+          <div class="stack-step">
+            <div class="step-badge">VERIFY</div>
+            <div class="step-content">
+              <h4>Evidence-Grounded Answering Gateway</h4>
+              <p>Cross-checks values with tolerance and unit conversion. If an answer is missing or contradicted, it reports citations or raises a flagged mismatch.</p>
+              <span class="step-tech">FastAPI · Pydantic Verification · Cell-level Citations</span>
             </div>
           </div>
         </div>
 
-        <div class="telemetry-right">
-          <div class="glass-card" style="padding: 24px; height: 100%; display: flex; flex-direction: column; justify-content: space-between;">
+        <div>
+          <div class="panel" style="height: 100%; display: flex; flex-direction: column; justify-content: space-between;">
             <div>
-              <div style="font-family: var(--font-display); font-size: 1rem; color: #ffffff; margin-bottom: 12px;">
-                CAPABILITY RADAR MATRIX
+              <div class="panel-header">
+                <i class="fa-solid fa-server" style="color: var(--blue);"></i>
+                Production Deployment Stack
               </div>
-              <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 16px;">
-                Evaluated across multi-body assemblies, dirty spreadsheets, reversed text PDFs, and CAD topological extraction.
-              </p>
-              <div style="height: 230px; position: relative;">
-                <canvas id="radarChart"></canvas>
-              </div>
+              <ul style="list-style: none; font-size: 0.9rem; color: var(--text-secondary); line-height: 1.8;">
+                <li><strong>Backend:</strong> FastAPI with Async SQLAlchemy & Psycopg 3</li>
+                <li><strong>Database:</strong> PostgreSQL (storing part fragments & cell refs)</li>
+                <li><strong>Streaming:</strong> Server-Sent Events (SSE) live response proxy</li>
+                <li><strong>Frontend:</strong> Next.js 16 with Tailwind & React 19</li>
+                <li><strong>CAD Engine:</strong> OpenCascade Python wrapper (`OCP 7.7.2`)</li>
+                <li><strong>LLM Gateway:</strong> Multi-provider failover (Claude Code, Anthropic, Groq, with offline rule fallback)</li>
+              </ul>
             </div>
 
-            <div style="padding: 12px; background: rgba(0, 240, 255, 0.05); border-left: 3px solid var(--neon-cyan); font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-muted);">
-              VALIDATED WITH: SS304 Flanges, En8 Shafts, 6061-T6 Brackets, WCB Valve Bodies, and 7075-T6 Pneumatic Actuators.
+            <div style="background: rgba(0, 0, 0, 0.4); padding: 14px; border-radius: 6px; border: 1px solid var(--border-subtle); margin-top: 16px;">
+              <div style="font-family: var(--font-mono); font-size: 0.76rem; color: var(--cyan); margin-bottom: 4px;">
+                VERIFICATION PRINCIPLE
+              </div>
+              <div style="font-size: 0.85rem; color: var(--text-secondary);">
+                <em>"An app that says 'I can't find that in the files' is better than one that guesses."</em> — Built strictly into the LLM system prompt.
+              </div>
             </div>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- SLIDE 5: The Flight Plan (Roadmap & Implementation) -->
-    <section class="slide" id="slide-5">
-      <div style="max-width: 1400px; margin: 0 auto; width: 100%;">
-        <div class="tagline-badge">
-          <i class="fa-solid fa-map-location-dot"></i> MISSION ROADMAP
+    <!-- SLIDE 4: Evaluated Cases & Planted Issues -->
+    <section class="slide" id="slide-4">
+      <div style="max-width: 1350px; margin: 0 auto; width: 100%;">
+        <div class="slide-badge">
+          <i class="fa-solid fa-vial-circle-check"></i> Real Validation Cases
         </div>
-        <h2 class="slide-title">THE FLIGHT PLAN: SUPARCO INTEGRATION</h2>
-        <p class="slide-desc">
-          Structured deployment trajectory from today's hackathon prototype to full production integration across SUPARCO's precision manufacturing centers.
+        <h2 class="slide-title">Validated on Synthetic and Real-World Parts</h2>
+        <p class="slide-subtitle">
+          Our test suite includes both the official synthetic benchmark parts and 8 real-world mechanical assemblies from GrabCAD.
         </p>
 
-        <div class="flightplan-grid">
-          <div class="glass-card flight-phase-card active-phase">
-            <div class="phase-badge">PHASE 01 // COMPLETED</div>
-            <h3>Core & Stretch Benchmark</h3>
-            <ul>
-              <li>Schema-agnostic Excel ingestion</li>
-              <li>OpenCascade IGES & STEP parser</li>
-              <li>Planted mismatch quarantine</li>
-              <li>42-question verified golden eval set</li>
-            </ul>
+        <div class="case-grid">
+          <div class="case-card">
+            <div class="case-header">
+              <span class="case-title">Part 2283: Planted Mismatch Test</span>
+              <span class="status-tag tag-flag">FLAGGED DISCREPANCY</span>
+            </div>
+            <div class="case-body">
+              Excel states OD 50 mm & C36000 Brass, but the PDF drawing & 3D model specify OD 48 mm & Bronze C93200.
+            </div>
+            <div class="case-evidence">
+              Verdict: System successfully detects and flags both material and diameter conflicts with exact cell/drawing citations.
+            </div>
           </div>
 
-          <div class="glass-card flight-phase-card active-phase">
-            <div class="phase-badge">PHASE 02 // TODAY</div>
-            <h3>Real-World Generalization</h3>
-            <ul>
-              <li>8-part real-world GrabCAD suite</li>
-              <li>Multi-body assembly segmentation</li>
-              <li>Raster drawing OCR fallback</li>
-              <li>Unit auto-conversion engine</li>
-            </ul>
+          <div class="case-card">
+            <div class="case-header">
+              <span class="case-title">Part 2282: Unit Conversion Test</span>
+              <span class="status-tag tag-unit">UNIT MATCH</span>
+            </div>
+            <div class="case-body">
+              PDF drawing is in inches (4.000 x 2.500 x 0.375 in), while Excel manufacturing record is in mm (101.6 x 63.5 x 9.525 mm).
+            </div>
+            <div class="case-evidence">
+              Verdict: System converts units automatically. Validates dimensions match and correctly does NOT raise a false mismatch.
+            </div>
           </div>
 
-          <div class="glass-card flight-phase-card">
-            <div class="phase-badge">PHASE 03 // MONTHS 1-3</div>
-            <h3>SUPARCO Shopfloor Integration</h3>
-            <ul>
-              <li>Direct Siemens NX & CATIA hooks</li>
-              <li>CMM inspection record pairing</li>
-              <li>Air-gapped on-prem LLM deployment</li>
-              <li>AS9100 aerospace compliance logging</li>
-            </ul>
+          <div class="case-card">
+            <div class="case-header">
+              <span class="case-title">Part 2284: Missing Files Test</span>
+              <span class="status-tag tag-missing">HONEST REPORTING</span>
+            </div>
+            <div class="case-body">
+              Part 2284 (Cover Plate) exists in Excel Job Cards B, but has no PDF drawing and no 3D CAD model provided.
+            </div>
+            <div class="case-evidence">
+              Verdict: System answers questions from Excel, and clearly answers "Not available in provided files" for CAD/drawing queries.
+            </div>
           </div>
 
-          <div class="glass-card flight-phase-card">
-            <div class="phase-badge">PHASE 04 // MONTHS 4-6</div>
-            <h3>Autonomous Flight Qualification</h3>
-            <ul>
-              <li>Zero-touch GD&T tolerance validation</li>
-              <li>Satellite payload digital twin archive</li>
-              <li>Multi-facility distributed auditing</li>
-              <li>Launch readiness certificate generation</li>
-            </ul>
+          <div class="case-card">
+            <div class="case-header">
+              <span class="case-title">Part 3002: Revision History (Rev B vs A)</span>
+              <span class="status-tag tag-match">REVISION LOCKED</span>
+            </div>
+            <div class="case-body">
+              Drawing and Excel master list contain obsolete Rev A (Bore Ø18, C45) and active Rev B (Bore Ø20, EN8).
+            </div>
+            <div class="case-evidence">
+              Verdict: System correctly identifies Rev B as current, reports Ø20 mm, and notes Rev A was superseded.
+            </div>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- SLIDE 6: Transmission End (Call to Action) -->
-    <section class="slide" id="slide-6">
-      <div class="cta-container">
-        <div class="glass-card cta-summary-card">
-          <div class="tagline-badge">
-            <i class="fa-solid fa-broadcast-tower"></i> MISSION READY
+    <!-- SLIDE 5: Evaluation Harness & Quality -->
+    <section class="slide" id="slide-5">
+      <div class="eval-layout">
+        <div>
+          <div class="slide-badge">
+            <i class="fa-solid fa-microscope"></i> Rigorous Evaluation
           </div>
-          <h2 class="cta-title">ELEVATING AEROSPACE MANUFACTURING BEYOND HUMAN OVERSIGHT</h2>
-          <p style="font-size: 1.15rem; color: var(--text-muted); max-width: 780px; margin: 0 auto 24px auto; line-height: 1.6;">
-            We don't just answer questions about parts—we build the sovereign engineering defense layer that guarantees satellite payloads launch with zero manufacturing defects.
+          <h2 class="slide-title" style="font-size: 2.1rem;">Automated 42-Question Evaluation Harness</h2>
+          <p class="slide-subtitle" style="font-size: 1rem; margin-bottom: 20px;">
+            The codebase includes a comprehensive golden evaluation suite in <code>backend/evals/golden.jsonl</code> evaluated by an automated scoring harness.
           </p>
 
-          <div class="live-command-terminal">
-            <div><span style="color: var(--neon-cyan);">></span> SYSTEM STATUS: PRODUCTION READY</div>
-            <div><span style="color: var(--neon-cyan);">></span> BACKEND: FASTAPI + OPENCASCADE + OPENPYXL (PORT 8000)</div>
-            <div><span style="color: var(--neon-cyan);">></span> FRONTEND: NEXT.JS 16 + TAILWIND + SSE PROXY (PORT 3000)</div>
-            <div><span style="color: var(--neon-cyan);">></span> READY FOR LIVE DEMO WITH ANY PART NUMBER.</div>
+          <div class="eval-stat-box">
+            <div class="title"><i class="fa-solid fa-table"></i> Multi-Row & Ordered Lookups</div>
+            <div class="desc">Tests retrieving manufacturing operations in exact sequence, summing setup + run times, and calculating batch manufacturing cycles.</div>
           </div>
 
-          <div class="team-lineup">
-            <div class="team-member-chip">
-              <div class="member-avatar"><i class="fa-solid fa-code"></i></div>
-              <div class="member-name">LEAD ARCHITECT</div>
-              <div class="member-role">Full-Stack & Ingestion</div>
-            </div>
-            <div class="team-member-chip">
-              <div class="member-avatar"><i class="fa-solid fa-cube"></i></div>
-              <div class="member-name">CAD / AI SPECIALIST</div>
-              <div class="member-role">3D Geometry & Verifier</div>
-            </div>
-            <div class="team-member-chip">
-              <div class="member-avatar"><i class="fa-solid fa-chart-pie"></i></div>
-              <div class="member-name">EVALUATION LEAD</div>
-              <div class="member-role">Golden Set & Benchmarks</div>
-            </div>
-            <div class="team-member-chip">
-              <div class="member-avatar"><i class="fa-solid fa-satellite"></i></div>
-              <div class="member-name">DOMAIN ENGINEER</div>
-              <div class="member-role">Aerospace & CNC Tolerances</div>
-            </div>
+          <div class="eval-stat-box">
+            <div class="title"><i class="fa-solid fa-shield-virus"></i> Prompt Injection & Poisoning Defense</div>
+            <div class="desc">Includes adversarial tests: malicious user prompt injections and poisoned remarks cells in spreadsheets. The verifier isolates data from instructions.</div>
           </div>
 
-          <div style="display: flex; justify-content: center; gap: 18px; margin-top: 10px;">
-            <button class="btn-hud btn-hud-primary" onclick="goToSlide(0)">
-              <i class="fa-solid fa-rotate-left"></i> REPLAY PRESENTATION
-            </button>
-            <button class="btn-hud" onclick="window.open('http://localhost:3000', '_blank')">
-              <i class="fa-solid fa-arrow-up-right-from-square"></i> LAUNCH LIVE APPLICATION
-            </button>
+          <div class="eval-stat-box">
+            <div class="title"><i class="fa-solid fa-lock"></i> Ground Truth Isolation</div>
+            <div class="desc">Answer keys are sequestered in <code>backend/evals/answer_keys/</code> so file discovery cannot leak answers into LLM prompts.</div>
           </div>
+        </div>
+
+        <div>
+          <div class="panel" style="height: 100%;">
+            <div class="panel-header">
+              <i class="fa-solid fa-clipboard-check" style="color: #10b981;"></i>
+              Judge Scoring Alignment
+            </div>
+            
+            <div style="display: flex; flex-direction: column; gap: 14px; font-size: 0.92rem; color: var(--text-secondary);">
+              <div style="border-bottom: 1px solid var(--border-subtle); padding-bottom: 10px;">
+                <div style="display: flex; justify-content: space-between; font-weight: 700; color: var(--text-white); margin-bottom: 4px;">
+                  <span>1. Correct, Evidence-Based Answers</span>
+                  <span style="color: var(--cyan);">30% Weight</span>
+                </div>
+                <div>Every response returns file, sheet, row, and cell citations. No ungrounded claims.</div>
+              </div>
+
+              <div style="border-bottom: 1px solid var(--border-subtle); padding-bottom: 10px;">
+                <div style="display: flex; justify-content: space-between; font-weight: 700; color: var(--text-white); margin-bottom: 4px;">
+                  <span>2. Sources Combined (Tri-Source)</span>
+                  <span style="color: var(--cyan);">25% Weight</span>
+                </div>
+                <div>Simultaneous cross-checking between Excel, 2D PDF drawing, and 3D CAD models.</div>
+              </div>
+
+              <div style="border-bottom: 1px solid var(--border-subtle); padding-bottom: 10px;">
+                <div style="display: flex; justify-content: space-between; font-weight: 700; color: var(--text-white); margin-bottom: 4px;">
+                  <span>3. Honesty and Robustness</span>
+                  <span style="color: var(--cyan);">15% Weight</span>
+                </div>
+                <div>Explicitly says when data is missing. Handles unanswerable queries (price, delivery date).</div>
+              </div>
+
+              <div style="border-bottom: 1px solid var(--border-subtle); padding-bottom: 10px;">
+                <div style="display: flex; justify-content: space-between; font-weight: 700; color: var(--text-white); margin-bottom: 4px;">
+                  <span>4. Engineering Quality</span>
+                  <span style="color: var(--cyan);">15% Weight</span>
+                </div>
+                <div>Clean type-safe code, automated test suite, Docker compose, and Alembic migrations.</div>
+              </div>
+
+              <div>
+                <div style="display: flex; justify-content: space-between; font-weight: 700; color: var(--text-white); margin-bottom: 4px;">
+                  <span>5. Documentation & Presentation</span>
+                  <span style="color: var(--cyan);">15% Weight</span>
+                </div>
+                <div>Complete architecture docs, MADR architectural decision records, and live UI demo.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SLIDE 6: Live Demo & Conclusion -->
+    <section class="slide" id="slide-6">
+      <div class="demo-layout">
+        <div class="slide-badge">
+          <i class="fa-solid fa-terminal"></i> Ready for Live Demo
+        </div>
+        <h2 class="slide-title">Experience the Live Application</h2>
+        <p class="slide-subtitle" style="margin: 0 auto 16px auto;">
+          The system is fully built, containerized, and running. Test any part number with live streaming verified citations.
+        </p>
+
+        <div class="terminal-box">
+          <div>$ uv run cnc --help</div>
+          <div>✓ Database: PostgreSQL with 8 benchmark parts ingested</div>
+          <div>✓ CAD Kernel: OpenCascade B-Rep engine active</div>
+          <div>✓ Backend: FastAPI running on port 8000</div>
+          <div>✓ Frontend: Next.js 16 UI running on port 3000</div>
+          <div>$ Try entering part numbers: <strong>2280</strong>, <strong>2282</strong>, <strong>2283</strong>, <strong>2284</strong>, <strong>9001</strong></div>
+        </div>
+
+        <div style="display: flex; justify-content: center; gap: 16px; margin-top: 24px;">
+          <a class="btn btn-primary" href="http://localhost:3000" target="_blank">
+            <i class="fa-solid fa-arrow-up-right-from-square"></i> Open Live Web Application
+          </a>
+          <button class="btn btn-secondary" onclick="goToSlide(0)">
+            <i class="fa-solid fa-rotate-left"></i> Replay Presentation
+          </button>
+        </div>
+
+        <div style="margin-top: 30px; font-size: 0.82rem; color: var(--text-muted); font-family: var(--font-mono);">
+          SPEC'26 AI Problem · NED University · Hackathon Submission
         </div>
       </div>
     </section>
 
   </main>
 
-  <!-- Footer Navigation Controls -->
+  <!-- Footer -->
   <footer class="hud-footer">
-    <div style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-muted);">
-      SLIDE <span id="slide-num-indicator" style="color: var(--neon-cyan); font-weight: 700;">01</span> / 06
+    <div style="font-family: var(--font-mono); font-size: 0.82rem; color: var(--text-secondary);">
+      SLIDE <span id="slide-num-indicator" style="color: var(--text-white); font-weight: 700;">01</span> / 06
     </div>
 
     <div class="timeline-nav">
@@ -1262,31 +1076,14 @@
       <div class="nav-pip" onclick="goToSlide(5)"></div>
     </div>
 
-    <div class="deck-controls">
-      <button class="btn-hud" onclick="prevSlide()"><i class="fa-solid fa-chevron-left"></i> PREV</button>
-      <button class="btn-hud btn-hud-primary" onclick="nextSlide()">NEXT <i class="fa-solid fa-chevron-right"></i></button>
+    <div style="display: flex; gap: 10px;">
+      <button class="btn btn-secondary" onclick="prevSlide()"><i class="fa-solid fa-chevron-left"></i> Prev</button>
+      <button class="btn btn-primary" onclick="nextSlide()">Next <i class="fa-solid fa-chevron-right"></i></button>
     </div>
   </footer>
 
-  <!-- Main Presentation & 3D Script -->
+  <!-- 3D Scene Script -->
   <script>
-    // -------------------------------------------------------------------------
-    // 1. Telemetry Clock
-    // -------------------------------------------------------------------------
-    function updateClock() {
-      const now = new Date();
-      const h = String(now.getUTCHours()).padStart(2, '0');
-      const m = String(now.getUTCMinutes()).padStart(2, '0');
-      const s = String(now.getUTCSeconds()).padStart(2, '0');
-      const ms = String(Math.floor(now.getUTCMilliseconds() / 10)).padStart(2, '0');
-      document.getElementById('hud-clock').textContent = `${h}:${m}:${s}.${ms}`;
-    }
-    setInterval(updateClock, 35);
-    updateClock();
-
-    // -------------------------------------------------------------------------
-    // 2. Slide Navigation Logic
-    // -------------------------------------------------------------------------
     let currentSlide = 0;
     const slides = document.querySelectorAll('.slide');
     const pips = document.querySelectorAll('.nav-pip');
@@ -1294,7 +1091,6 @@
 
     function goToSlide(index) {
       if (index < 0 || index >= slides.length) return;
-      
       slides[currentSlide].classList.remove('active');
       pips[currentSlide].classList.remove('active');
 
@@ -1304,434 +1100,170 @@
       pips[currentSlide].classList.add('active');
       slideIndicator.textContent = String(currentSlide + 1).padStart(2, '0');
 
-      // Sync 3D camera and models based on slide
-      update3DSceneForSlide(currentSlide);
-
-      // Trigger metric counters on slide 4
-      if (currentSlide === 3) {
-        animateNumbers();
-      }
+      update3DCamera(currentSlide);
     }
 
     function nextSlide() {
-      if (currentSlide < slides.length - 1) {
-        goToSlide(currentSlide + 1);
-      } else {
-        goToSlide(0);
-      }
+      goToSlide(currentSlide < slides.length - 1 ? currentSlide + 1 : 0);
     }
 
     function prevSlide() {
-      if (currentSlide > 0) {
-        goToSlide(currentSlide - 1);
-      }
+      if (currentSlide > 0) goToSlide(currentSlide - 1);
     }
 
-    // Keyboard navigation
     window.addEventListener('keydown', (e) => {
       if (e.key === 'ArrowRight' || e.key === 'Space') nextSlide();
       if (e.key === 'ArrowLeft') prevSlide();
     });
 
-    // -------------------------------------------------------------------------
-    // 3. Three.js 3D Aerospace Payload Showcase
-    // -------------------------------------------------------------------------
+    // -------------------------------------------------------------
+    // Three.js 3D Engine: Renders real mechanical components
+    // -------------------------------------------------------------
     const canvas = document.getElementById('webgl-canvas');
     const scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0x03030d, 0.025);
-
     const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 5, 22);
+    camera.position.set(0, 4, 18);
 
     const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-    // Lighting setup
-    const ambientLight = new THREE.AmbientLight(0x002244, 1.2);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.9);
     scene.add(ambientLight);
 
-    const keyLight = new THREE.DirectionalLight(0x00f0ff, 2.5);
-    keyLight.position.set(10, 20, 15);
-    scene.add(keyLight);
+    const dirLight1 = new THREE.DirectionalLight(0x00d2ff, 1.6);
+    dirLight1.position.set(10, 15, 10);
+    scene.add(dirLight1);
 
-    const fillLight = new THREE.DirectionalLight(0x0066ff, 1.8);
-    fillLight.position.set(-15, -10, -10);
-    scene.add(fillLight);
+    const dirLight2 = new THREE.DirectionalLight(0x3b82f6, 1.2);
+    dirLight2.position.set(-10, -10, -5);
+    scene.add(dirLight2);
 
-    const pointLight = new THREE.PointLight(0x9d4edd, 2, 50);
-    pointLight.position.set(0, -5, 10);
-    scene.add(pointLight);
-
-    // Deep space particles
-    const particleCount = 700;
-    const particleGeometry = new THREE.BufferGeometry();
-    const particlePositions = new Float32Array(particleCount * 3);
-    for (let i = 0; i < particleCount * 3; i += 3) {
-      particlePositions[i] = (Math.random() - 0.5) * 120;
-      particlePositions[i + 1] = (Math.random() - 0.5) * 120;
-      particlePositions[i + 2] = (Math.random() - 0.5) * 80;
-    }
-    particleGeometry.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
-    const particleMaterial = new THREE.PointsMaterial({
-      color: 0x00f0ff,
-      size: 0.28,
-      transparent: true,
-      opacity: 0.6,
-      blending: THREE.AdditiveBlending
-    });
-    const starField = new THREE.Points(particleGeometry, particleMaterial);
-    scene.add(starField);
-
-    // 3D Model Parent Group
-    const showcaseGroup = new THREE.Group();
-    scene.add(showcaseGroup);
+    const partGroup = new THREE.Group();
+    scene.add(partGroup);
 
     let isWireframe = false;
-    let standardMaterial = new THREE.MeshStandardMaterial({
-      color: 0x112244,
-      metalness: 0.85,
+    const steelMaterial = new THREE.MeshStandardMaterial({
+      color: 0x2a3b5c,
+      metalness: 0.7,
+      roughness: 0.3,
+      wireframe: false
+    });
+
+    const highlightMaterial = new THREE.MeshStandardMaterial({
+      color: 0x00d2ff,
+      metalness: 0.9,
       roughness: 0.2,
       wireframe: false
     });
 
-    let accentMaterial = new THREE.MeshStandardMaterial({
-      color: 0x00f0ff,
-      metalness: 0.9,
-      roughness: 0.1,
-      emissive: 0x004466,
-      wireframe: false
-    });
+    // Real Part 1: Flange 2280 (Center bore D40, 6 x D10 holes on D90 PCD)
+    function buildFlange() {
+      const g = new THREE.Group();
+      const disc = new THREE.Mesh(new THREE.CylinderGeometry(4.8, 4.8, 0.9, 48), steelMaterial);
+      g.add(disc);
 
-    let currentModelType = 'satellite';
+      const hub = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.2, 1.8, 36), highlightMaterial);
+      hub.position.y = 0.45;
+      g.add(hub);
 
-    // Model Generators
-    function createSatellitePayload() {
-      const group = new THREE.Group();
-      
-      // Central chassis cylinder
-      const bodyGeo = new THREE.CylinderGeometry(2.4, 2.4, 6.5, 32);
-      const body = new THREE.Mesh(bodyGeo, standardMaterial);
-      group.add(body);
-
-      // Ring ribs
-      for (let y = -2.5; y <= 2.5; y += 1.25) {
-        const ringGeo = new THREE.TorusGeometry(2.55, 0.08, 16, 64);
-        const ring = new THREE.Mesh(ringGeo, accentMaterial);
-        ring.rotation.x = Math.PI / 2;
-        ring.position.y = y;
-        group.add(ring);
-      }
-
-      // Dish antenna
-      const dishGeo = new THREE.SphereGeometry(2.8, 32, 16, 0, Math.PI * 2, 0, Math.PI / 3);
-      const dish = new THREE.Mesh(dishGeo, accentMaterial);
-      dish.position.y = 4.2;
-      dish.rotation.x = Math.PI;
-      group.add(dish);
-
-      // Solar panel wings
-      const panelGeo = new THREE.BoxGeometry(7, 0.1, 2.2);
-      const panel1 = new THREE.Mesh(panelGeo, accentMaterial);
-      panel1.position.set(6.2, 0, 0);
-      group.add(panel1);
-
-      const panel2 = new THREE.Mesh(panelGeo, accentMaterial);
-      panel2.position.set(-6.2, 0, 0);
-      group.add(panel2);
-
-      // Orbit target reticle
-      const reticleGeo = new THREE.RingGeometry(4.8, 4.9, 64);
-      const reticleMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff, side: THREE.DoubleSide, transparent: true, opacity: 0.4 });
-      const reticle = new THREE.Mesh(reticleGeo, reticleMat);
-      reticle.rotation.x = Math.PI / 3;
-      group.add(reticle);
-
-      return group;
-    }
-
-    function createGimbalPivot() {
-      const group = new THREE.Group();
-      // Outer Gimbal Ring
-      const ring1Geo = new THREE.TorusGeometry(4.5, 0.25, 16, 64);
-      const ring1 = new THREE.Mesh(ring1Geo, standardMaterial);
-      group.add(ring1);
-
-      // Mid Gimbal Ring
-      const ring2Geo = new THREE.TorusGeometry(3.6, 0.2, 16, 64);
-      const ring2 = new THREE.Mesh(ring2Geo, accentMaterial);
-      ring2.rotation.x = Math.PI / 3;
-      group.add(ring2);
-
-      // Inner Core
-      const coreGeo = new THREE.IcosahedronGeometry(1.8, 2);
-      const core = new THREE.Mesh(coreGeo, standardMaterial);
-      group.add(core);
-
-      // Pivot brackets
-      const clevisGeo = new THREE.BoxGeometry(0.8, 2.2, 5.2);
-      const clevis = new THREE.Mesh(clevisGeo, accentMaterial);
-      group.add(clevis);
-
-      return group;
-    }
-
-    function createFlangeModel() {
-      const group = new THREE.Group();
-      // Flange outer disc
-      const discGeo = new THREE.CylinderGeometry(4.8, 4.8, 0.9, 48);
-      const disc = new THREE.Mesh(discGeo, standardMaterial);
-      group.add(disc);
-
-      // Center Bore
-      const hubGeo = new THREE.CylinderGeometry(2.4, 2.4, 2.2, 48);
-      const hub = new THREE.Mesh(hubGeo, accentMaterial);
-      hub.position.y = 0.6;
-      group.add(hub);
-
-      // Bolt holes on PCD (Pitch Circle Diameter)
       for (let i = 0; i < 6; i++) {
         const angle = (i / 6) * Math.PI * 2;
-        const holeGeo = new THREE.CylinderGeometry(0.38, 0.38, 1.2, 16);
-        const hole = new THREE.Mesh(holeGeo, new THREE.MeshBasicMaterial({ color: 0x03030d }));
+        const hole = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 1.1, 16), new THREE.MeshBasicMaterial({ color: 0x0a0d14 }));
         hole.position.set(Math.cos(angle) * 3.6, 0, Math.sin(angle) * 3.6);
-        group.add(hole);
+        g.add(hole);
       }
-
-      return group;
+      return g;
     }
 
-    let activeMesh = createSatellitePayload();
-    showcaseGroup.add(activeMesh);
+    // Real Part 2: Stepped Shaft 2281 (D30 x 160 + D25 x 40)
+    function buildShaft() {
+      const g = new THREE.Group();
+      const mainSection = new THREE.Mesh(new THREE.CylinderGeometry(1.8, 1.8, 7.5, 36), steelMaterial);
+      g.add(mainSection);
 
-    function switchModel(type) {
-      currentModelType = type;
-      showcaseGroup.remove(activeMesh);
+      const stepSection = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.4, 2.5, 36), highlightMaterial);
+      stepSection.position.y = 5.0;
+      g.add(stepSection);
+      g.rotation.z = Math.PI / 2;
+      return g;
+    }
 
-      document.querySelectorAll('.model-switch-btn').forEach(b => b.classList.remove('active'));
-      event?.target?.closest('.model-switch-btn')?.classList.add('active');
+    // Real Part 3: Bushing 2283 (OD 48 x 40, Bore 30)
+    function buildBushing() {
+      const g = new THREE.Group();
+      const outer = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.4, 4.0, 36), steelMaterial);
+      g.add(outer);
 
-      if (type === 'satellite') activeMesh = createSatellitePayload();
-      if (type === 'gimbal') activeMesh = createGimbalPivot();
-      if (type === 'flange') activeMesh = createFlangeModel();
+      const inner = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 4.1, 36), new THREE.MeshBasicMaterial({ color: 0x0a0d14 }));
+      g.add(inner);
+      return g;
+    }
 
-      applyWireframeState();
-      showcaseGroup.add(activeMesh);
+    let currentMesh = buildFlange();
+    partGroup.add(currentMesh);
+
+    function loadModel(type) {
+      partGroup.remove(currentMesh);
+      document.querySelectorAll('.model-btn').forEach(b => b.classList.remove('active'));
+      event?.target?.closest('.model-btn')?.classList.add('active');
+
+      if (type === 'flange') currentMesh = buildFlange();
+      if (type === 'shaft') currentMesh = buildShaft();
+      if (type === 'bushing') currentMesh = buildBushing();
+
+      applyWireframe();
+      partGroup.add(currentMesh);
     }
 
     function toggleWireframe() {
       isWireframe = !isWireframe;
-      applyWireframeState();
+      applyWireframe();
     }
 
-    function applyWireframeState() {
-      activeMesh.traverse((child) => {
-        if (child.isMesh && child.material) {
+    function applyWireframe() {
+      currentMesh.traverse((child) => {
+        if (child.isMesh && child.material && child.material.wireframe !== undefined) {
           child.material.wireframe = isWireframe;
         }
       });
     }
 
-    // Dynamic camera transforms based on active slide
-    function update3DSceneForSlide(slideIdx) {
-      let targetPos = { x: 0, y: 5, z: 22 };
-      let groupPos = { x: 0, y: 0, z: 0 };
-      let targetRot = { x: 0.2, y: 0 };
+    function update3DCamera(slideIdx) {
+      let targetX = 0, targetY = 3, targetZ = 18;
+      let groupX = 0;
 
       if (slideIdx === 0) {
-        // Center showcase
-        targetPos = { x: 4, y: 2, z: 18 };
-        groupPos = { x: 4, y: 0, z: 0 };
+        groupX = 4.5;
+        targetZ = 16;
       } else if (slideIdx === 1) {
-        // Shift right, tilt warning
-        targetPos = { x: 0, y: 6, z: 24 };
-        groupPos = { x: 8, y: -2, z: -5 };
+        groupX = 6;
+        targetZ = 20;
       } else if (slideIdx === 2) {
-        // Focus on CAD payload inspection
-        targetPos = { x: 0, y: 4, z: 16 };
-        groupPos = { x: 6, y: 0, z: 2 };
-      } else if (slideIdx === 3) {
-        // Top overview for telemetry
-        targetPos = { x: 0, y: 12, z: 20 };
-        groupPos = { x: 0, y: -4, z: -4 };
-      } else if (slideIdx === 4) {
-        // Distant flight vector
-        targetPos = { x: -3, y: 2, z: 26 };
-        groupPos = { x: 0, y: 0, z: -10 };
-      } else if (slideIdx === 5) {
-        // Epic frontal view
-        targetPos = { x: 0, y: 0, z: 15 };
-        groupPos = { x: 0, y: 2, z: 0 };
+        groupX = 5;
+        targetZ = 17;
+      } else {
+        groupX = 0;
+        targetZ = 24;
       }
 
-      gsap.to(camera.position, {
-        x: targetPos.x,
-        y: targetPos.y,
-        z: targetPos.z,
-        duration: 1.4,
-        ease: 'power2.out'
-      });
-
-      gsap.to(showcaseGroup.position, {
-        x: groupPos.x,
-        y: groupPos.y,
-        z: groupPos.z,
-        duration: 1.4,
-        ease: 'power2.out'
-      });
+      gsap.to(camera.position, { z: targetZ, y: targetY, duration: 1.2, ease: 'power2.out' });
+      gsap.to(partGroup.position, { x: groupX, duration: 1.2, ease: 'power2.out' });
     }
 
-    // Interactive mouse rotation
-    let mouseX = 0, mouseY = 0;
-    let targetRotationX = 0, targetRotationY = 0;
-
-    window.addEventListener('mousemove', (e) => {
-      mouseX = (e.clientX / window.innerWidth) * 2 - 1;
-      mouseY = -(e.clientY / window.innerHeight) * 2 + 1;
-      targetRotationY = mouseX * 0.45;
-      targetRotationX = -mouseY * 0.35;
-    });
-
-    // Render loop
+    // Animation Loop
     function animate() {
       requestAnimationFrame(animate);
-
-      // Continuous slow rotation + mouse follow
-      showcaseGroup.rotation.y += 0.005;
-      showcaseGroup.rotation.x += (targetRotationX - showcaseGroup.rotation.x) * 0.05;
-      showcaseGroup.rotation.z += (targetRotationY - showcaseGroup.rotation.z) * 0.05;
-
-      starField.rotation.y -= 0.0008;
-
+      partGroup.rotation.y += 0.007;
+      partGroup.rotation.x += 0.002;
       renderer.render(scene, camera);
     }
     animate();
 
-    // Window resize handling
     window.addEventListener('resize', () => {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
-    });
-
-    // -------------------------------------------------------------------------
-    // 4. Telemetry Metric Counters Animation
-    // -------------------------------------------------------------------------
-    function animateNumbers() {
-      const counters = [
-        { id: 'counter-speed', target: 97.5, suffix: '%' },
-        { id: 'counter-accuracy', target: 99.8, suffix: '%' },
-        { id: 'counter-citations', target: 100, suffix: '%' }
-      ];
-
-      counters.forEach(c => {
-        const el = document.getElementById(c.id);
-        if (!el) return;
-        const obj = { val: 0 };
-        gsap.to(obj, {
-          val: c.target,
-          duration: 1.6,
-          ease: 'power3.out',
-          onUpdate: () => {
-            el.textContent = obj.val.toFixed(c.target % 1 === 0 ? 0 : 1) + c.suffix;
-          }
-        });
-      });
-    }
-
-    // -------------------------------------------------------------------------
-    // 5. Chart.js High-Tech Telemetry Visualizations
-    // -------------------------------------------------------------------------
-    let latencyChartInstance = null;
-    let radarChartInstance = null;
-
-    function initCharts() {
-      // 1. Latency Bar Chart
-      const ctx1 = document.getElementById('telemetryChart');
-      if (ctx1) {
-        latencyChartInstance = new Chart(ctx1, {
-          type: 'bar',
-          data: {
-            labels: ['Excel Lookup', 'PDF OCR/GD&T', '3D IGES B-Rep', 'Full 3-Way Cross Check'],
-            datasets: [
-              {
-                label: 'Manual Engineering Inspection (Minutes)',
-                data: [45, 120, 180, 345],
-                backgroundColor: 'rgba(255, 42, 95, 0.45)',
-                borderColor: '#ff2a5f',
-                borderWidth: 1
-              },
-              {
-                label: 'CNC-SENTINEL Autonomous Engine (Seconds)',
-                data: [0.4, 1.8, 2.4, 4.6],
-                backgroundColor: 'rgba(0, 240, 255, 0.75)',
-                borderColor: '#00f0ff',
-                borderWidth: 1
-              }
-            ]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-              y: {
-                type: 'logarithmic',
-                grid: { color: 'rgba(0, 240, 255, 0.1)' },
-                ticks: { color: '#8b9bb4', font: { family: 'JetBrains Mono' } }
-              },
-              x: {
-                grid: { display: false },
-                ticks: { color: '#8b9bb4', font: { family: 'Rajdhani', size: 12 } }
-              }
-            },
-            plugins: {
-              legend: {
-                labels: { color: '#f0f6fc', font: { family: 'Orbitron', size: 10 } }
-              }
-            }
-          }
-        });
-      }
-
-      // 2. Radar Capability Chart
-      const ctx2 = document.getElementById('radarChart');
-      if (ctx2) {
-        radarChartInstance = new Chart(ctx2, {
-          type: 'radar',
-          data: {
-            labels: ['Unit Conversion', 'GD&T Alignment', 'Dirty Excel Mapping', '3D PCD Extraction', 'Zero Hallucination', 'Multi-Body Support'],
-            datasets: [{
-              label: 'CNC-SENTINEL Performance',
-              data: [100, 96, 99, 98, 100, 95],
-              backgroundColor: 'rgba(0, 240, 255, 0.25)',
-              borderColor: '#00f0ff',
-              pointBackgroundColor: '#00f0ff',
-              pointBorderColor: '#ffffff',
-              borderWidth: 2
-            }]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-              r: {
-                angleLines: { color: 'rgba(0, 240, 255, 0.15)' },
-                grid: { color: 'rgba(0, 240, 255, 0.1)' },
-                pointLabels: { color: '#8b9bb4', font: { family: 'Rajdhani', size: 11 } },
-                ticks: { display: false, max: 100, min: 0 }
-              }
-            },
-            plugins: {
-              legend: { display: false }
-            }
-          }
-        });
-      }
-    }
-
-    // Initialize charts once DOM is ready
-    window.addEventListener('DOMContentLoaded', () => {
-      initCharts();
     });
   </script>
 </body>
