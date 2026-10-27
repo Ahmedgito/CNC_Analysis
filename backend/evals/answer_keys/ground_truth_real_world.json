@@ -1,5 +1,5 @@
 {
-  "_note": "Answer key for REAL-WORLD validation parts (docs/real_world/). Do not feed to the app. Geometry measured from the original STEP with tools/inspect_cad.py. Excel = docs/real_world/real_world_records.xlsx.",
+  "_note": "Answer key for REAL-WORLD validation parts (docs/real_world/). Do not feed to the app. Geometry measured from original STEP with tools/inspect_cad.py. Excel = docs/real_world/real_world_records.xlsx.",
   "9001": {
     "name": "S-Shaped Flanged Pipe Connector",
     "source": "GrabCAD 'S-Shaped Flanged Pipe Connector' (Mehdi Jalali), SolidWorks export",
@@ -7,7 +7,7 @@
       "excel": "docs/real_world/real_world_records.xlsx (Parts + Operations)",
       "iges": "docs/real_world/9001_s_pipe_connector/Part1.igs (converted from Part1.STEP)",
       "step": "docs/real_world/9001_s_pipe_connector/Part1.STEP",
-      "pdf": "NOT AVAILABLE (only Part1.SLDDRW, unreadable without SolidWorks; referenced .SLDPRT missing)"
+      "pdf": "NOT AVAILABLE (only Part1.SLDDRW, unreadable without SolidWorks)"
     },
     "geometry_truth": {
       "units": "mm",
@@ -18,7 +18,7 @@
       "bolt_holes": "12 x D15 (6 per flange) on D120 PCD, 60 deg spacing",
       "volume_mm3": 1343343
     },
-    "planted_issue": "MISMATCH: Excel Holes column and Ops 40/50 say 8 x D15 (4 per flange); IGES has 12 x D15 (6 per flange). MUST be flagged. Flange OD, bore, PCD and envelope all AGREE and must NOT be flagged.",
+    "planted_issue": "MISMATCH: Excel Holes column and Ops 40/50 say 8 x D15 (4 per flange); IGES has 12 x D15 (6 per flange). MUST be flagged. Flange OD, bore, PCD and envelope all AGREE.",
     "expected_answers": {
       "material": "ASTM A216 WCB cast steel (Excel)",
       "how many bolt holes": "Flag disagreement: Excel 8 vs IGES 12; cite both",
@@ -26,10 +26,69 @@
       "flange OD / bore": "D140 / D80 (Excel and IGES agree)",
       "overall size": "435 x 235 x 140 mm (Excel and IGES agree)",
       "cycle time": "55 min (Excel)",
-      "operations": "5 ops: face A, face B, bore, drill A, drill B (Excel)",
-      "drawing / title block / drawing number": "Drawing NOT AVAILABLE",
-      "weight": "Not in Excel. If computed: 1,343,343 mm3 x 7.85 g/cm3 ~ 10.5 kg, must be labelled as derived from IGES volume + assumed density",
+      "operations": "5 ops (Excel)",
+      "drawing / title block": "Drawing NOT AVAILABLE",
       "unit price / customer / delivery date": "Not found in the provided files"
+    }
+  },
+  "9002": {
+    "name": "Wider Air Gripper HFT Series (HFT32)",
+    "source": "3Dfindit / GrabCAD Pneumatic Cylinders HFT32",
+    "files": {
+      "excel": "docs/real_world/real_world_records.xlsx",
+      "iges": "docs/real_world/9002_air_gripper_hft32/HFT32X60S(0).igs",
+      "step": "docs/real_world/9002_air_gripper_hft32/HFT32X60S(0).stp",
+      "pdf": "docs/real_world/9002_air_gripper_hft32/HFT32X60S(0).pdf (3D PDF datasheet with technical table on p.4)"
+    },
+    "geometry_truth": {
+      "units": "mm",
+      "bodies": 3,
+      "bbox_mm": [245.0, 100.0, 82.0],
+      "bore_mm": 32.0,
+      "stroke_mm": 60.0,
+      "thread_type": "PT Thread (M8x1.25 / M10x1.5)",
+      "volume_mm3": 835835
+    },
+    "planted_issue": "none; HAPPY PATH where Excel, PDF Technical Data (p.4), and 3D model all AGREE (Bore 32 mm, Stroke 60 mm, Dimension A 245 mm, AB 100 mm).",
+    "expected_answers": {
+      "bore size": "32 mm (Excel, PDF p.4, and IGES agree)",
+      "stroke": "60 mm (Excel and PDF p.4 agree)",
+      "material": "Aluminum 6061-T6 (Excel)",
+      "overall envelope": "245 x 100 x 82 mm (Excel, PDF p.4 dim A/AB, and IGES agree)",
+      "thread type": "PT Thread, M8x1.25 / M10x1.5 (Excel and PDF agree)",
+      "cycle time": "42 min (Excel)",
+      "operations": "4 ops (Excel)",
+      "unit price / delivery date": "Not found in the provided files"
+    }
+  },
+  "9003": {
+    "name": "Clamp Cylinder MCK Series (MCK80)",
+    "source": "3Dfindit / GrabCAD Pneumatic Cylinders MCK80",
+    "files": {
+      "excel": "docs/real_world/real_world_records.xlsx",
+      "iges": "docs/real_world/9003_clamp_cylinder_mck80/MCK80x50P(0).igs",
+      "step": "docs/real_world/9003_clamp_cylinder_mck80/MCK80x50P(0).stp",
+      "pdf": "docs/real_world/9003_clamp_cylinder_mck80/MCK80x50P(0).pdf (3D PDF datasheet with technical table on p.4)"
+    },
+    "geometry_truth": {
+      "units": "mm",
+      "bodies": 2,
+      "bbox_mm": [253.0, 115.4, 93.0],
+      "bore_mm": 80.0,
+      "stroke_mm": 50.0,
+      "thread_type": "PT (Port PT 3/8, mounting M6x1)",
+      "volume_mm3": 830918
+    },
+    "planted_issue": "MISMATCH: Excel claims Stroke is 75 mm, but PDF Technical Data (p.4) and model code MCK80x50 state Stroke is 50 mm. MUST be flagged.",
+    "expected_answers": {
+      "bore size": "80 mm (Excel and PDF p.4 agree)",
+      "stroke": "Flag disagreement: Excel claims 75 mm, but PDF p.4 specifies 50 mm (model MCK80x50P)",
+      "material": "Aluminum 7075-T6 (Excel)",
+      "port thread": "PT 3/8 (Excel and PDF agree)",
+      "overall envelope": "253 x 115 x 93 mm (Excel and IGES agree)",
+      "cycle time": "65 min (Excel)",
+      "operations": "4 ops (Excel)",
+      "unit price / delivery date": "Not found in the provided files"
     }
   }
 }

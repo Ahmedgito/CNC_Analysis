@@ -44,6 +44,35 @@ PARTS = [
         "Normalized",
         20,
     ],
+    [
+        "9002",
+        "Wider Air Gripper HFT Series (HFT32)",
+        "Aluminum 6061-T6",
+        "255 x 110 x 90 (billet block)",
+        "245 x 100 x 82 envelope; Bore \u00d832, Stroke 60 mm",
+        "Mounting holes M8x1.25, 4 x \u00d84.2, 4 x \u00d812 c-bore",
+        "Haas VF-2 mill",
+        42,
+        "\u00b10.05 mm",
+        "Ra 0.8",
+        "Hard Anodize",
+        50,
+    ],
+    [
+        "9003",
+        "Clamp Cylinder MCK Series (MCK80)",
+        "Aluminum 7075-T6",
+        "260 x 125 x 100 (billet block)",
+        # PLANTED MISMATCH: Excel claims Stroke 75 mm; PDF technical data & 3D model are Stroke 50 mm (MCK80x50)
+        "253 x 115 x 93 envelope; Bore \u00d880, Stroke 75 mm",
+        "Port threads PT 3/8, mounting M6x1",
+        "Mazak Integrex e-420H",
+        65,
+        "\u00b10.05 mm",
+        "Ra 0.8",
+        "None",
+        30,
+    ],
 ]
 
 OPS_HEADER = ["Part No", "Op No", "Operation", "Machine", "Tool", "Setup (min)", "Run (min)"]
@@ -54,6 +83,14 @@ OPERATIONS = [
     ["9001", 30, "Finish bore \u00d880 both ends", "Mazak QT-200", "\u00d840 boring bar", 5, 8],
     ["9001", 40, "Drill 4 holes \u00d815 flange A", "Haas VF-2", "\u00d815 drill", 10, 4],
     ["9001", 50, "Drill 4 holes \u00d815 flange B", "Haas VF-2", "\u00d815 drill", 10, 4],
+    ["9002", 10, "Face 6 sides to envelope 245 x 100 x 82", "Haas VF-2", "\u00d850 face mill", 12, 10],
+    ["9002", 20, "Bore \u00d832 cylinder chamber", "Haas VF-2", "\u00d820 boring head", 6, 8],
+    ["9002", 30, "Mill guide tracks and pockets", "Haas VF-2", "\u00d812 end mill", 8, 12],
+    ["9002", 40, "Drill and tap M8x1.25 / M10x1.5 mounting holes", "Haas VF-2", "\u00d86.8 drill, M8 tap", 5, 6],
+    ["9003", 10, "Rough turn OD and face cylinder body", "Mazak Integrex", "CNMG 120408 insert", 15, 12],
+    ["9003", 20, "Finish bore \u00d880 cylinder cavity", "Mazak Integrex", "\u00d850 boring bar", 10, 15],
+    ["9003", 30, "Thread port holes PT 3/8", "Mazak Integrex", "PT 3/8 tap", 8, 6],
+    ["9003", 40, "Mill clamp mounting brackets and pockets", "Mazak Integrex", "\u00d816 end mill", 12, 14],
 ]
 
 
@@ -81,3 +118,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
