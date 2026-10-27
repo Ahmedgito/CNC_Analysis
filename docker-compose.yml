@@ -1,0 +1,49 @@
+name: cnc-analyzer
+
+services:
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: cnc
+      POSTGRES_PASSWORD: cnc
+      POSTGRES_DB: cnc
+    ports:
+      - "5434:5432" # 5434 on the host avoids clashing with a local Postgres on 5432/5433
+    volumes:
+      - pgdata:/var/lib/postgresql
+      - ./backend/scripts/init-test-db.sql:/docker-entrypoint-initdb.d/10-test-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cnc -d cnc"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  backend:
+    build: ./backend
+    env_file:
+      - path: ./backend/.env
+        required: false
+    environment:
+      DATABASE_URL: postgresql+psycopg://cnc:cnc@db:5432/cnc
+      DATA_DIR: /data
+      CORS_ORIGINS: '["http://localhost:3000"]'
+      AUTO_INGEST: "true"
+    volumes:
+      - ./data:/data:ro
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    environment:
+      BACKEND_URL: http://backend:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:

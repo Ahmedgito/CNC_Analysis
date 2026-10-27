@@ -1,0 +1,39 @@
+# Run with `pre-commit install` (or `prek install`, a faster drop-in that reads this file).
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-yaml
+      - id: check-merge-conflict
+      - id: detect-private-key
+      - id: check-added-large-files
+        args: ["--maxkb=2000"]
+
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check (backend)
+        entry: bash -c 'cd backend && uv run ruff check --fix .'
+        language: system
+        files: ^backend/.*\.py$
+        pass_filenames: false
+      - id: ruff-format
+        name: ruff format (backend)
+        entry: bash -c 'cd backend && uv run ruff format .'
+        language: system
+        files: ^backend/.*\.py$
+        pass_filenames: false
+      - id: prettier
+        name: prettier (frontend)
+        entry: bash -c 'cd frontend && pnpm exec prettier --write .'
+        language: system
+        files: ^frontend/.*\.(ts|tsx|mjs|json|css|md)$
+        pass_filenames: false
+      - id: eslint
+        name: eslint (frontend)
+        entry: bash -c 'cd frontend && pnpm lint'
+        language: system
+        files: ^frontend/.*\.(ts|tsx|mjs)$
+        pass_filenames: false

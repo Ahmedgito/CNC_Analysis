@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: cnc
+          POSTGRES_PASSWORD: cnc
+          POSTGRES_DB: cnc_test
+        ports: ["5434:5432"]
+        options: >-
+          --health-cmd "pg_isready -U cnc -d cnc_test" --health-interval 3s --health-timeout 3s --health-retries 20
+    env:
+      PYTHONUTF8: "1"
+      DATABASE_URL: postgresql+psycopg://cnc:cnc@localhost:5434/cnc_test
+      DATABASE_URL_TEST: postgresql+psycopg://cnc:cnc@localhost:5434/cnc_test
+      LLM_PRIMARY_PROVIDER: fake
+      LLM_FALLBACK_PROVIDER: none
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run pyright
+      - run: uv run pytest -q
+      - name: Golden-set eval (offline provider, regression gate)
+        run: |
+          uv run alembic upgrade head
+          uv run cnc ingest ../data
+          uv run cnc eval --provider fake --out eval-ci.md
+          cat eval-ci.md >> "$GITHUB_STEP_SUMMARY"
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm format:check
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
