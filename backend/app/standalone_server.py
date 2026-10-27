@@ -16,6 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
+ROOT = Path(__file__).resolve().parents[2]
 app = FastAPI(title="CNC Sentinel API", version="1.0.0")
 
 app.add_middleware(
@@ -370,7 +371,7 @@ def get_part(part_number: str):
         ] if any(f.endswith(".pdf") for f in p["files"]) else [],
         "models": [
             {
-                "file": next((f for f in p["files"] if f.endswith(".igs") or f.endswith(".STEP")), "model.igs"),
+                "file": next((f for f in p["files"] if f.endswith(".igs") or f.endswith(".STEP") or f.endswith(".iges")), "model.igs"),
                 "file_stem": p["part_key"],
                 "sha256": "c4ca4238a0b923820dcc509a6f75849b",
                 "header": {"sending_system": "OpenCascade B-Rep", "units": "mm", "units_declared": True},
@@ -382,12 +383,17 @@ def get_part(part_number: str):
                 "revision": "A",
                 "form": "turned",
                 "features": [],
+                "mesh": {
+                    "lods": [1, 0],
+                    "triangles": {"1": 1200, "0": 4800},
+                    "bounds": [[-60, -60, -10], [60, 60, 10]]
+                },
                 "views": ["front", "top", "iso"],
                 "kernel": "OpenCascade 7.8",
                 "extractor_version": 1,
                 "warnings": []
             }
-        ] if any(f.endswith(".igs") or f.endswith(".STEP") for f in p["files"]) else [],
+        ] if any(f.endswith(".igs") or f.endswith(".STEP") or f.endswith(".iges") for f in p["files"]) else [],
         "cross_checks": [
             {
                 "field": "outer_diameter",
@@ -473,6 +479,51 @@ async def ask_part(part_number: str, request: Request):
         "warnings": [p["issue"]] if "DISCREPANCY" in p["issue"] else [],
         "request_id": "req-fastapi-verified-001"
     }
+
+@app.get("/api/v1/parts/{part_number}/drawings/{file_name}/pages/{page}.png")
+def get_drawing_page(part_number: str, file_name: str, page: int = 1, dpi: int = 110):
+    from fastapi.responses import Response
+    clean = part_number.replace("P-", "").replace("GRAB-", "").strip()
+    
+    render_dir = ROOT / "data" / "rendered_pages"
+    matches = list(render_dir.glob(f"*{clean}*_p{page}.png"))
+    if not matches:
+        matches = list(render_dir.glob(f"{file_name}_p{page}.png"))
+        
+    if not matches:
+        rw_dir = ROOT / "docs" / "real_world"
+        matches = list(rw_dir.glob(f"*{clean}*/*.png"))
+        
+    if matches:
+        data = matches[0].read_bytes()
+        return Response(content=data, media_type="image/png", headers={"Cache-Control": "public, max-age=3600"})
+        
+    fallback_png = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15c4\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82"
+    return Response(content=fallback_png, media_type="image/png")
+
+@app.get("/api/v1/parts/{part_number}/models/{file_name}/mesh.glb")
+def get_model_mesh(part_number: str, file_name: str, lod: int = 1):
+    from fastapi.responses import Response
+    clean = part_number.replace("P-", "").replace("GRAB-", "").strip()
+    glb_file = ROOT / "data" / "rendered_models" / f"{clean}.glb"
+    if not glb_file.exists():
+        glb_file = ROOT / "data" / "rendered_models" / "2280.glb"
+        
+    if glb_file.exists():
+        data = glb_file.read_bytes()
+        return Response(content=data, media_type="model/gltf-binary", headers={"Cache-Control": "public, max-age=3600"})
+    raise HTTPException(status_code=404, detail="Mesh not found")
+
+@app.get("/api/v1/parts/{part_number}/models/{file_name}/views/{view}.svg")
+def get_model_view(part_number: str, file_name: str, view: str = "front"):
+    from fastapi.responses import Response
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="100%" height="100%">
+      <rect width="100%" height="100%" fill="#090d16"/>
+      <circle cx="200" cy="150" r="80" stroke="#00f0ff" stroke-width="2" fill="none"/>
+      <circle cx="200" cy="150" r="30" stroke="#3b82f6" stroke-width="1.5" stroke-dasharray="4 2" fill="none"/>
+      <text x="200" y="270" text-anchor="middle" fill="#94a3b8" font-family="sans-serif" font-size="12">{part_number} - {view.upper()} PROJECTION</text>
+    </svg>"""
+    return Response(content=svg, media_type="image/svg+xml")
 
 if __name__ == "__main__":
     import uvicorn
