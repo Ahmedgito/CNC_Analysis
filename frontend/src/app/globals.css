@@ -8,4 +8,6 @@
 @theme inline {
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  /* Easing shared by component transitions (Tailwind: ease-out-expo). */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 }
