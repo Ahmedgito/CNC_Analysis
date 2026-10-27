@@ -1,0 +1,93 @@
+"""Command line: ``uv run cnc ingest data/``, ``uv run cnc serve``."""
+
+from __future__ import annotations
+
+import argparse
+import sys
+from pathlib import Path
+
+from app.config import get_settings
+
+
+def _cmd_ingest(args: argparse.Namespace) -> int:
+    from app.db.session import make_engine, make_session_factory
+    from app.logging_setup import configure_logging
+    from app.services.ingest_service import ingest_paths
+
+    settings = get_settings()
+    configure_logging(settings.log_level, settings.log_format)
+    path = Path(args.path or settings.data_dir)
+    if not path.exists():
+        print(f"error: {path} does not exist", file=sys.stderr)
+        return 2
+    engine = make_engine(settings.database_url)
+    try:
+        outcomes = ingest_paths(make_session_factory(engine), path)
+    finally:
+        engine.dispose()
+    if not outcomes:
+        print(f"No .xlsx/.xls/.csv files found under {path}")
+        return 1
+    for o in outcomes:
+        print(f"{o.status:<10} {o.file_name:<32} parts={','.join(o.parts) or '-'}")
+        for w in o.warnings:
+            print(f"           ! {w}")
+    return 1 if any(o.status == "failed" for o in outcomes) else 0
+
+
+def _cmd_serve(args: argparse.Namespace) -> int:
+    import uvicorn
+
+    uvicorn.run(
+        "app.main:create_app",
+        factory=True,
+        host=args.host,
+        port=args.port,
+        reload=args.reload,
+    )
+    return 0
+
+
+def _cmd_eval(args: argparse.Namespace) -> int:
+    from app.evaluation import rescore, run_eval
+
+    out = Path(args.out) if args.out else None
+    if args.rescore:
+        return rescore(Path(args.rescore), out)
+    delay = args.delay if args.delay is not None else (8.0 if args.provider == "groq" else 0.0)
+    return run_eval(args.provider, out, delay)
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(prog="cnc", description="SPEC'26 CNC part analyzer")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    p_ingest = sub.add_parser("ingest", help="Ingest a spreadsheet or a directory of them")
+    p_ingest.add_argument("path", nargs="?", help="File or directory (default: DATA_DIR)")
+    p_ingest.set_defaults(func=_cmd_ingest)
+
+    p_serve = sub.add_parser("serve", help="Run the API server")
+    p_serve.add_argument("--host", default="127.0.0.1")
+    p_serve.add_argument("--port", type=int, default=8000)
+    p_serve.add_argument("--reload", action="store_true")
+    p_serve.set_defaults(func=_cmd_serve)
+
+    p_eval = sub.add_parser("eval", help="Run the golden-set evaluation through the API")
+    p_eval.add_argument(
+        "--provider", choices=["fake", "anthropic", "claude_code", "groq"], default="fake"
+    )
+    p_eval.add_argument("--out", help="Markdown report path, e.g. ../docs/eval-results.md")
+    p_eval.add_argument(
+        "--delay", type=float, help="Seconds between questions (default 8 for groq free tier)"
+    )
+    p_eval.add_argument(
+        "--rescore", metavar="RUN.json", help="Re-score a saved run offline (no LLM calls)"
+    )
+    p_eval.set_defaults(func=_cmd_eval)
+
+    args = parser.parse_args(argv)
+    return int(args.func(args))
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
