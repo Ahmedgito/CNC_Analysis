@@ -90,6 +90,14 @@ class _Context:
     replay_question: str | None = None  # the question that offer was made on
 
 
+def _source_names(records: list[PartRecord]) -> list[str]:
+    names: list[str] = []
+    for r in records:
+        names += [n for s in r.sheets for n in (s.file, s.sheet)]
+        names += [d.file for d in r.drawings]
+    return names
+
+
 class AskService:
     def __init__(
         self,
@@ -383,6 +391,7 @@ class AskService:
                     base["question"],
                     extra_allowed=[comp.value] + [i.number for i in comp.inputs] if comp else None,
                     part_keys=[ctx.record.part_key, *(e.part_key for e in ctx.extra_records)],
+                    source_names=_source_names([ctx.record, *ctx.extra_records]),
                 )
                 if unsupported:
                     confidence = "low"

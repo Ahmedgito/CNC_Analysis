@@ -163,6 +163,7 @@ def check_numbers(
     question: str,
     extra_allowed: list[float] | None = None,
     part_keys: list[str] | None = None,
+    source_names: list[str] | None = None,
 ) -> list[str]:
     allowed: set[str] = set()
     for e in verification.evidence:
@@ -178,7 +179,8 @@ def check_numbers(
         allowed |= _number_forms(n)
     for n in extra_allowed or []:
         allowed |= _number_forms(n)
-    for key in part_keys or []:
+    # Part numbers, and file or sheet names the answer may mention ("the Archive_2025 sheet").
+    for key in [*(part_keys or []), *(source_names or [])]:
         allowed |= set(_ANSWER_NUMBER_RE.findall(key))
     unsupported: list[str] = []
     for token in _ANSWER_NUMBER_RE.findall(answer):

@@ -93,6 +93,13 @@ def test_number_grounding_allows_question_numbers_and_computed_values():
     assert check_numbers("For 10 parts that is 280 min.", v, "time for 10 parts?", [280.0]) == []
 
 
+def test_numbers_in_file_and_sheet_names_are_not_claims():
+    v = verify_citations([EvidenceItem(fact_id="A!Parts!H2", quoted_value="28")], CELLS)
+    answer = "Cycle time is 28 min; the Archive_2025 sheet lists an older bore of 22 mm."
+    names = ["messy_workshop_export.xlsx", "Archive_2025"]
+    assert check_numbers(answer, v, "?", source_names=names) == ["22"]
+
+
 def _ops_cell(cid: str, value: str, canonical: str) -> Fact:
     col_row = cid.rsplit("!", 1)[1]
     return _fact(
