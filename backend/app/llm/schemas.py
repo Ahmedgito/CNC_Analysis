@@ -12,7 +12,12 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 DraftStatus = Literal[
-    "answered", "not_in_record", "needs_computation", "clarify", "refused_injection"
+    "answered",
+    "not_in_record",
+    "needs_computation",
+    "needs_consent",
+    "clarify",
+    "refused_injection",
 ]
 
 
@@ -21,15 +26,20 @@ class _Strict(BaseModel):
 
 
 class EvidenceItem(_Strict):
-    cell_id: str = Field(description="Exact cell id from the record, e.g. mfg_record_A!Parts!C2")
-    quoted_value: str = Field(description="The cell's value copied exactly as shown in the record")
+    fact_id: str = Field(
+        description=(
+            "Exact fact id from the record: a spreadsheet cell (mfg_record_A!Parts!C2) or a "
+            "drawing fact (2280_flange!p1!tb!material)"
+        )
+    )
+    quoted_value: str = Field(description="The fact's value copied exactly as shown in the record")
 
 
 class ComputationInput(_Strict):
     name: str = Field(description="Variable name used in the expression: c1, c2, ...")
-    cell_id: str
+    fact_id: str
     number_index: int = Field(
-        description="Which number inside the cell value to use, 0-based (Ø125 x 25 -> 0 is 125)"
+        description="Which number inside the fact's value to use, 0-based (Ø125 x 25 -> 0 is 125)"
     )
 
 

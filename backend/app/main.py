@@ -13,18 +13,25 @@ from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app.api import ask, conversations, health, ingest, parts
+from app.api import ask, conversations, drawings, health, ingest, models, parts
 from app.api.deps import ProblemError, problem_response
-from app.config import Settings, get_settings
+from app.config import Settings, geometry_worker, get_settings
 from app.db.session import make_engine, make_session_factory
 from app.llm.gateway import FailoverGateway, build_gateway
+from app.llm.vision import VisionProvider, build_vision
 from app.logging_setup import configure_logging, log
+from app.services.file_store import FileStore
 from app.services.ingest_service import ingest_paths
+from app.services.vision_service import VisionService
 
 API_PREFIX = "/api/v1"
 
 
-def create_app(settings: Settings | None = None, gateway: FailoverGateway | None = None) -> FastAPI:
+def create_app(
+    settings: Settings | None = None,
+    gateway: FailoverGateway | None = None,
+    vision: VisionProvider | None = None,
+) -> FastAPI:
     settings = settings or get_settings()
     configure_logging(settings.log_level, settings.log_format)
 
@@ -35,13 +42,30 @@ def create_app(settings: Settings | None = None, gateway: FailoverGateway | None
         app.state.engine = engine
         app.state.session_factory = make_session_factory(engine)
         app.state.gateway = gateway or build_gateway(settings)
+        app.state.store = FileStore(settings.store_dir)
+        # The geometry worker is shared per process and starts its subprocess lazily, on the
+        # first IGES file, so apps that never see a model never pay for the kernel.
+        app.state.geometry = geometry_worker(settings)
+        vision_provider = vision if vision is not None else build_vision(settings)
+        app.state.vision = VisionService(
+            app.state.session_factory, app.state.store, vision_provider, settings.model_prices
+        )
+        log.info(
+            "startup.vision",
+            provider=f"{vision_provider.name}:{vision_provider.model}" if vision_provider else None,
+        )
         log.info(
             "startup.llm",
             providers=[f"{p.name}:{p.model}" for p in app.state.gateway.providers],
         )
         if settings.auto_ingest and settings.data_dir.exists():
             outcomes = await run_in_threadpool(
-                ingest_paths, app.state.session_factory, settings.data_dir
+                ingest_paths,
+                app.state.session_factory,
+                settings.data_dir,
+                app.state.store,
+                settings.pdf_max_pages,
+                app.state.geometry,
             )
             log.info("startup.auto_ingest", files=[(o.file_name, o.status) for o in outcomes])
         log.info("startup.ready", env=settings.app_env)
@@ -52,9 +76,10 @@ def create_app(settings: Settings | None = None, gateway: FailoverGateway | None
         title="SPEC'26 CNC Part Analyzer",
         version="0.1.0",
         description=(
-            "Evidence-grounded answers about CNC parts from their manufacturing records. "
-            "Every answer cites the exact spreadsheet cells it used, or says the information "
-            "is not in the files."
+            "Evidence-grounded answers about CNC parts from their manufacturing records, PDF "
+            "engineering drawings and IGES 3D models. Every answer cites the exact spreadsheet "
+            "cell, drawing region or measured model feature it used, cross-checks the three "
+            "sources, or says the information is not in the files."
         ),
         lifespan=lifespan,
     )
@@ -96,4 +121,6 @@ def create_app(settings: Settings | None = None, gateway: FailoverGateway | None
     app.include_router(ingest.router, prefix=API_PREFIX)
     app.include_router(ask.router, prefix=API_PREFIX)
     app.include_router(conversations.router, prefix=API_PREFIX)
+    app.include_router(drawings.router, prefix=API_PREFIX)
+    app.include_router(models.router, prefix=API_PREFIX)
     return app

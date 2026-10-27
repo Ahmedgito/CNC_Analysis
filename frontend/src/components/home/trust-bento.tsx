@@ -251,8 +251,8 @@ function VerifyDemo() {
 function SourcesDemo() {
   const nodes = [
     { label: "Excel", Icon: FileSpreadsheet, live: true, x: 18 },
-    { label: "PDF", Icon: FileText, live: false, x: 50 },
-    { label: "IGES", Icon: Box, live: false, x: 82 },
+    { label: "PDF", Icon: FileText, live: true, x: 50 },
+    { label: "IGES", Icon: Box, live: true, x: 82 },
   ];
   return (
     <div className="relative h-36">
@@ -393,8 +393,8 @@ export function TrustBento() {
           index={4}
           className="lg:col-span-2"
           icon={<FileSpreadsheet className="size-4.5" aria-hidden />}
-          title="Excel today, PDF and IGES next"
-          body="Every part already tracks its three sources, so drawings and 3D models slot in."
+          title="Three sources, cross-checked"
+          body="Spreadsheets, drawings and 3D models are read, cited and compared field by field; the file that differs is named."
         >
           <SourcesDemo />
         </Tile>

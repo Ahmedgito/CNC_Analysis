@@ -2,25 +2,33 @@
 
 import {
   AlertTriangle,
+  ArrowLeftRight,
   BookOpen,
+  Box,
   Calculator,
   CheckCircle2,
   ChevronDown,
   CircleHelp,
   Cpu,
+  Eye,
   FileSearch,
+  FileSpreadsheet,
+  FileText,
+  History,
   Link2,
   LocateFixed,
+  ScanEye,
   ShieldAlert,
   ShieldCheck,
   XCircle,
 } from "lucide-react";
-import { motion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
-import { useState } from "react";
+import { useId, useState } from "react";
 import ReactMarkdown from "react-markdown";
-import type { AnswerStatus, AskResult, Evidence } from "@/lib/api/schemas";
+import type { AnswerStatus, AskAction, AskResult, Evidence } from "@/lib/api/schemas";
 import { cn } from "@/lib/cn";
+import { CrossCheckList } from "./cross-checks";
 import { HoverCard } from "./ui/hover-card";
 
 const STATUS: Record<AnswerStatus, { label: string; className: string; Icon: typeof CheckCircle2 }> = {
@@ -47,6 +55,12 @@ const STATUS: Record<AnswerStatus, { label: string; className: string; Icon: typ
     className:
       "bg-violet-50 text-violet-800 ring-violet-200 dark:bg-violet-400/10 dark:text-violet-300 dark:ring-violet-400/25",
     Icon: CircleHelp,
+  },
+  needs_consent: {
+    label: "Needs your go-ahead",
+    className:
+      "bg-orange-50 text-orange-900 ring-orange-200 dark:bg-orange-400/10 dark:text-orange-200 dark:ring-orange-400/25",
+    Icon: ScanEye,
   },
   blocked: {
     label: "Request blocked",
@@ -99,15 +113,28 @@ export function StatusPill({ status }: { status: AnswerStatus }) {
   );
 }
 
+/** "file › sheet › C2" for a cell, "file › p1 › Dimension › Diameter" for a drawing callout,
+ * "file › Model › Outer diameter" for a measured model feature. */
+export function evidenceLabel(e: Evidence) {
+  if (e.locator) return `${e.file} › ${e.locator}`;
+  return e.source === "pdf" ? `${e.file} › p${e.page ?? 1}` : `${e.file} › ${e.sheet} › ${e.cell}`;
+}
+
 function EvidencePreview({ evidence }: { evidence: Evidence }) {
+  const pdf = evidence.source === "pdf";
+  const iges = evidence.source === "iges";
   return (
     <span className="flex flex-col gap-2">
       <span className="flex items-center justify-between gap-2 font-mono text-[11px] text-zinc-500">
         <span className="truncate">
-          {evidence.file} › {evidence.sheet}
+          {evidence.file} › {iges ? "3D model" : pdf ? `page ${evidence.page ?? 1}` : evidence.sheet}
         </span>
         <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-zinc-700 dark:bg-white/10 dark:text-zinc-200">
-          {evidence.cell}
+          {iges
+            ? (evidence.feature ?? "feature").replaceAll("_", " ")
+            : pdf
+              ? (evidence.region ?? "drawing").replace("_", " ")
+              : evidence.cell}
         </span>
       </span>
       <span className="text-[11px] tracking-wide text-zinc-500 uppercase">{evidence.header}</span>
@@ -116,8 +143,27 @@ function EvidencePreview({ evidence }: { evidence: Evidence }) {
       </span>
       <span className="flex items-center gap-1 text-[11px] text-cyan-700 dark:text-cyan-300">
         <LocateFixed className="size-3" aria-hidden />
-        Click to locate this cell in the record
+        {iges
+          ? "Click to show this feature on the 3D model"
+          : pdf
+            ? "Click to locate this callout on the drawing"
+            : "Click to locate this cell in the record"}
       </span>
+      {iges && evidence.method ? (
+        <span className="text-[11px] text-indigo-700 dark:text-indigo-300">
+          Measured by the app from the model&apos;s geometry: {evidence.method}.
+        </span>
+      ) : null}
+      {evidence.confidence === "vision" ? (
+        <span className="text-[11px] text-violet-700 dark:text-violet-300">
+          Read from a scanned image by the vision model. Check it against the drawing before relying on it.
+        </span>
+      ) : null}
+      {evidence.stale ? (
+        <span className="text-[11px] text-zinc-500">
+          History: an archived or superseded value, not the current one.
+        </span>
+      ) : null}
       {evidence.auto_linked ? (
         <span className="text-[11px] text-zinc-500">
           Linked automatically: the answer states this value but the model did not cite it.
@@ -137,13 +183,17 @@ export function EvidenceChip({
 }: {
   evidence: Evidence;
   active?: boolean;
-  onSelect?: (cellId: string) => void;
+  onSelect?: (factId: string) => void;
 }) {
+  const pdf = evidence.source === "pdf";
+  const iges = evidence.source === "iges";
+  const vision = evidence.confidence === "vision";
+  const SourceIcon = iges ? Box : pdf ? FileText : FileSpreadsheet;
   return (
     <HoverCard content={<EvidencePreview evidence={evidence} />}>
       <motion.button
         type="button"
-        onClick={() => onSelect?.(evidence.cell_id)}
+        onClick={() => onSelect?.(evidence.fact_id)}
         whileHover={{ y: -1 }}
         whileTap={{ scale: 0.97 }}
         className={cn(
@@ -151,17 +201,55 @@ export function EvidenceChip({
           active
             ? "border-amber-400 bg-amber-100 text-amber-900 shadow-sm shadow-amber-500/20 dark:bg-amber-400/15 dark:text-amber-200"
             : "border-zinc-200 bg-zinc-50 text-zinc-700 hover:border-cyan-400/60 hover:bg-white dark:border-white/10 dark:bg-white/5 dark:text-zinc-300",
-          evidence.auto_linked && "border-dashed",
+          (evidence.auto_linked || vision) && "border-dashed",
+          vision && !active && "border-violet-400/70",
+          evidence.stale && "opacity-70",
         )}
       >
+        <SourceIcon
+          className={cn(
+            "size-3 shrink-0",
+            iges ? "text-indigo-500" : pdf ? "text-rose-500" : "text-emerald-600",
+          )}
+          aria-hidden
+        />
         {evidence.auto_linked ? <Link2 className="size-3 shrink-0" aria-hidden /> : null}
-        <span className="truncate">
-          {evidence.file} › {evidence.sheet} › {evidence.cell}
+        {vision ? (
+          <Eye className="size-3 shrink-0 text-violet-500" aria-label="read by vision model" />
+        ) : null}
+        {evidence.stale ? <History className="size-3 shrink-0" aria-label="history" /> : null}
+        <span className="truncate">{evidenceLabel(evidence)}</span>
+        <span className="truncate font-sans text-zinc-500 dark:text-zinc-400">
+          · {pdf || iges ? evidence.value : evidence.header}
         </span>
-        <span className="truncate font-sans text-zinc-500 dark:text-zinc-400">· {evidence.header}</span>
       </motion.button>
     </HoverCard>
   );
+}
+
+/** Chips shown before "See all". */
+export const SOURCE_PREVIEW = 4;
+
+/**
+ * The first few sources, keeping at least one per source kind (spreadsheet, drawing, model) so
+ * a collapsed answer still shows every file it drew on.
+ */
+export function previewSources(evidence: Evidence[], n = SOURCE_PREVIEW): Evidence[] {
+  if (evidence.length <= n) return evidence;
+  const preview = evidence.slice(0, n);
+  for (const kind of ["excel", "pdf", "iges"] as const) {
+    const first = evidence.find((e) => e.source === kind);
+    if (!first || preview.some((e) => e.source === kind)) continue;
+    // Replace the last chip of the kind that has the most chips in the preview.
+    const counts = preview.reduce<Record<string, number>>(
+      (m, e) => ({ ...m, [e.source]: (m[e.source] ?? 0) + 1 }),
+      {},
+    );
+    const crowded = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0];
+    const at = preview.findLastIndex((e) => e.source === crowded);
+    if (at >= 0) preview[at] = first;
+  }
+  return evidence.filter((e) => preview.includes(e)); // keep the answer's citation order
 }
 
 const markdown = {
@@ -187,16 +275,40 @@ const reveal = {
 
 export function AnswerCard({
   result,
-  selectedCellId,
-  onSelectCell,
+  selectedFactId,
+  onSelectFact,
+  onAction,
 }: {
   result: AskResult;
-  selectedCellId?: string | null;
-  onSelectCell?: (cellId: string) => void;
+  selectedFactId?: string | null;
+  onSelectFact?: (factId: string) => void;
+  /** Approve an offered action (e.g. reading a scan); undefined while another question runs. */
+  onAction?: (action: AskAction) => void;
 }) {
   const v = result.verification;
   const p = result.provider;
   const [showFields, setShowFields] = useState(false);
+  const [approved, setApproved] = useState<string | null>(null);
+  const [showAllSources, setShowAllSources] = useState(false);
+  const sourcesId = useId();
+  const preview = previewSources(result.evidence);
+  // A highlighted fact hidden behind "See all" (e.g. picked from the cross-check list) opens it.
+  const selectedHidden =
+    selectedFactId != null &&
+    result.evidence.some((e) => e.fact_id === selectedFactId) &&
+    !preview.some((e) => e.fact_id === selectedFactId);
+  const sourcesOpen = showAllSources || selectedHidden;
+  const shownSources = sourcesOpen ? result.evidence : preview;
+  const hiddenCount = result.evidence.length - preview.length;
+  const kindCount = (k: Evidence["source"]) => result.evidence.filter((e) => e.source === k).length;
+  // "7 spreadsheet, 5 drawing, 1 model" whenever the answer drew on more than one kind of file.
+  const sourceSummary = (
+    [
+      [kindCount("excel"), "spreadsheet"],
+      [kindCount("pdf"), "drawing"],
+      [kindCount("iges"), "model"],
+    ] as const
+  ).filter(([n]) => n > 0);
   const verified = v && v.citations_checked + v.auto_linked > 0;
 
   return (
@@ -246,21 +358,93 @@ export function AnswerCard({
 
       {result.evidence.length ? (
         <motion.div variants={reveal} className="flex flex-col gap-1.5">
-          <p className="text-[11px] font-medium tracking-[0.15em] text-zinc-500 uppercase">Sources</p>
-          <motion.div
-            className="flex flex-wrap gap-1.5"
-            variants={{ show: { transition: { staggerChildren: 0.05 } } }}
-          >
-            {result.evidence.map((e) => (
-              <motion.span
-                key={e.cell_id}
-                variants={{ hidden: { opacity: 0, scale: 0.9 }, show: { opacity: 1, scale: 1 } }}
-                className="max-w-full"
-              >
-                <EvidenceChip evidence={e} active={selectedCellId === e.cell_id} onSelect={onSelectCell} />
-              </motion.span>
-            ))}
+          <p className="flex flex-wrap items-baseline gap-x-2 text-[11px] font-medium tracking-[0.15em] text-zinc-500 uppercase">
+            Sources
+            <span className="font-mono tracking-normal text-zinc-400 normal-case">
+              {result.evidence.length}
+              {sourceSummary.length > 1
+                ? ` · ${sourceSummary.map(([n, label]) => `${n} ${label}`).join(", ")}`
+                : ""}
+            </span>
+          </p>
+          <motion.div layout className="flex flex-wrap gap-1.5" id={sourcesId}>
+            <AnimatePresence initial={true} mode="popLayout">
+              {shownSources.map((e, i) => (
+                <motion.span
+                  key={e.fact_id}
+                  layout
+                  initial={{ opacity: 0, scale: 0.9, y: 4 }}
+                  animate={{ opacity: 1, scale: 1, y: 0, transition: { delay: Math.min(i, 12) * 0.03 } }}
+                  exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.12 } }}
+                  className="max-w-full"
+                >
+                  <EvidenceChip evidence={e} active={selectedFactId === e.fact_id} onSelect={onSelectFact} />
+                </motion.span>
+              ))}
+            </AnimatePresence>
           </motion.div>
+          {hiddenCount > 0 && !selectedHidden ? (
+            <button
+              type="button"
+              aria-expanded={sourcesOpen}
+              aria-controls={sourcesId}
+              onClick={() => setShowAllSources((v) => !v)}
+              className="group inline-flex w-fit items-center gap-1 rounded-lg px-1.5 py-0.5 text-xs font-medium text-cyan-700 transition-colors hover:bg-cyan-50 focus-visible:ring-2 focus-visible:ring-cyan-500/60 focus-visible:outline-none dark:text-cyan-300 dark:hover:bg-cyan-400/10"
+            >
+              {sourcesOpen ? "Show fewer" : `See all ${result.evidence.length} sources`}
+              {sourcesOpen ? null : (
+                <span className="rounded-full bg-cyan-100 px-1.5 font-mono text-[10px] text-cyan-800 dark:bg-cyan-400/15 dark:text-cyan-200">
+                  +{hiddenCount}
+                </span>
+              )}
+              <ChevronDown
+                className={cn("size-3.5 transition-transform duration-200", sourcesOpen && "rotate-180")}
+                aria-hidden
+              />
+            </button>
+          ) : null}
+        </motion.div>
+      ) : null}
+
+      {result.actions.length ? (
+        <motion.div variants={reveal} className="flex flex-col gap-2">
+          {result.actions.map((a) => (
+            <motion.button
+              key={`${a.id}-${a.file}`}
+              type="button"
+              disabled={!onAction || approved !== null}
+              onClick={() => {
+                setApproved(a.file);
+                onAction?.(a);
+              }}
+              whileHover={{ y: -1 }}
+              whileTap={{ scale: 0.98 }}
+              className="group relative inline-flex w-fit items-center gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 px-3.5 py-2 text-sm font-medium text-white shadow-md shadow-orange-500/25 transition-opacity focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <span
+                aria-hidden
+                className="absolute inset-y-0 -left-1/2 w-1/2 -skew-x-12 bg-white/25 transition-transform duration-700 group-hover:translate-x-[300%]"
+              />
+              <ScanEye className="relative size-4" aria-hidden />
+              <span className="relative">{approved === a.file ? "Reading the scan…" : a.label}</span>
+            </motion.button>
+          ))}
+          <p className="text-xs text-zinc-500">
+            The page images are sent to the vision model. Values read this way are labelled{" "}
+            <span className="inline-flex items-center gap-0.5 text-violet-700 dark:text-violet-300">
+              <Eye className="size-3" aria-hidden /> vision
+            </span>{" "}
+            so you can check them against the drawing.
+          </p>
+        </motion.div>
+      ) : null}
+
+      {result.cross_checks.length ? (
+        <motion.div variants={reveal} className="flex flex-col gap-1.5">
+          <p className="flex items-center gap-1.5 text-[11px] font-medium tracking-[0.15em] text-zinc-500 uppercase">
+            <ArrowLeftRight className="size-3" aria-hidden /> Spreadsheet · drawing · model
+          </p>
+          <CrossCheckList checks={result.cross_checks} onSelect={onSelectFact} />
         </motion.div>
       ) : null}
 
@@ -341,7 +525,7 @@ export function AnswerCard({
           {v && verified ? (
             <span
               className="inline-flex items-center gap-1.5"
-              title={v.dropped.map((d) => `${d.cell_id}: ${d.reason}`).join("\n")}
+              title={v.dropped.map((d) => `${d.fact_id}: ${d.reason}`).join("\n")}
             >
               <ShieldCheck className="size-3.5 text-emerald-500" aria-hidden />
               <span>

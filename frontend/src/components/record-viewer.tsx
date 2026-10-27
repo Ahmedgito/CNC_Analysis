@@ -1,15 +1,47 @@
 "use client";
 
-import { AlertTriangle, EyeOff, FileSpreadsheet, Rows3, Table2 } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowLeftRight,
+  Box,
+  EyeOff,
+  FileSpreadsheet,
+  FileText,
+  History,
+  Rows3,
+  ScanEye,
+  Table2,
+} from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import type { CellRef, PartRecord, SheetSlice } from "@/lib/api/schemas";
+import type { CellRef, DrawingSlice, ModelSlice, PartRecord, SheetSlice } from "@/lib/api/schemas";
+import { modelFactId } from "@/lib/api/schemas";
 import { cn } from "@/lib/cn";
+import { useFactSelection } from "@/lib/selection";
+import { CrossCheckList } from "./cross-checks";
+import { DrawingViewer } from "./drawing-viewer";
+import { ModelPanel } from "./model/model-panel";
 import { AnimatedTabs } from "./ui/animated-tabs";
 
 const sheetKey = (s: SheetSlice) => `${s.file}::${s.sheet}`;
+const drawingKey = (d: DrawingSlice) => `pdf::${d.file}`;
+const modelKey = (m: ModelSlice) => `iges::${m.file}`;
+const CHECKS = "checks";
+
+function HistoryTag({ reason }: { reason?: string | null }) {
+  return (
+    <span
+      title={reason ?? "History, never used as the current value"}
+      className="ml-1 inline-flex items-center gap-0.5 rounded bg-zinc-100 px-1 align-middle font-sans text-[10px] font-normal text-zinc-500 not-italic dark:bg-white/5"
+    >
+      <History className="size-2.5" aria-hidden /> history
+    </span>
+  );
+}
 
 function CellText({ cell, selected }: { cell: CellRef; selected: boolean }) {
+  // The same field in another file is selected: outline this cell too (linked selection).
+  const related = useFactSelection().isRelated(cell.cell_id) && !selected;
   return (
     <span
       data-cell-id={cell.cell_id}
@@ -17,6 +49,7 @@ function CellText({ cell, selected }: { cell: CellRef; selected: boolean }) {
       className={cn(
         "relative inline-block rounded-md px-1 py-0.5 transition-colors duration-300",
         selected && "bg-amber-200/80 text-amber-950 dark:bg-amber-400/20 dark:text-amber-100",
+        related && "bg-amber-100/60 ring-1 ring-amber-300 ring-dashed dark:bg-amber-400/10",
         cell.hidden && "text-zinc-500 italic",
       )}
     >
@@ -53,8 +86,11 @@ function AttributeTable({ sheet, selected }: { sheet: SheetSlice; selected?: str
   return (
     <div className="flex flex-col gap-4">
       {sheet.rows.map((row) => (
-        <table key={row.row} className="w-full text-sm">
-          <caption className="pb-1 text-left font-mono text-[11px] text-zinc-400">Row {row.row}</caption>
+        <table key={row.row} className={cn("w-full text-sm", row.stale && "opacity-60")}>
+          <caption className="pb-1 text-left font-mono text-[11px] text-zinc-400">
+            {sheet.layout === "card" ? "Part card, labels down the first column" : `Row ${row.row}`}
+            {row.stale ? <HistoryTag reason={row.stale_reason} /> : null}
+          </caption>
           <motion.tbody
             className="divide-y divide-zinc-100 dark:divide-white/5"
             initial="hidden"
@@ -125,9 +161,12 @@ function RowsTable({ sheet, selected }: { sheet: SheetSlice; selected?: string |
               <motion.tr
                 key={row.row}
                 variants={rowIn}
-                className="hover:bg-zinc-50 dark:hover:bg-white/[0.02]"
+                className={cn("hover:bg-zinc-50 dark:hover:bg-white/[0.02]", row.stale && "text-zinc-500")}
               >
-                <td className="py-2 pr-3 pl-3 font-mono text-xs text-zinc-400">{row.row}</td>
+                <td className="py-2 pr-3 pl-3 font-mono text-xs whitespace-nowrap text-zinc-400">
+                  {row.row}
+                  {row.stale ? <HistoryTag reason={row.stale_reason} /> : null}
+                </td>
                 {sheet.columns.map((col) => {
                   const cell = byCol.get(col.col);
                   return (
@@ -147,28 +186,41 @@ function RowsTable({ sheet, selected }: { sheet: SheetSlice; selected?: string |
 
 export function RecordViewer({
   record,
-  selectedCellId,
+  selectedFactId,
+  onSelectFact,
   className,
 }: {
   record: PartRecord;
-  selectedCellId?: string | null;
+  /** A spreadsheet cell id or a drawing fact id; the viewer opens the tab that holds it. */
+  selectedFactId?: string | null;
+  onSelectFact?: (factId: string) => void;
   className?: string;
 }) {
   const panelId = useId();
-  const [active, setActive] = useState(() => (record.sheets[0] ? sheetKey(record.sheets[0]) : ""));
+  const firstTab = record.sheets[0]
+    ? sheetKey(record.sheets[0])
+    : record.drawings[0]
+      ? drawingKey(record.drawings[0])
+      : record.models[0]
+        ? modelKey(record.models[0])
+        : "";
+  const [active, setActive] = useState(firstTab);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const sheetOfCell = useMemo(() => {
+  const tabOfFact = useMemo(() => {
     const map = new Map<string, string>();
     for (const s of record.sheets) {
       for (const r of s.rows) for (const c of r.cells) map.set(c.cell_id, sheetKey(s));
       for (const b of s.banner) map.set(b.cell_id, sheetKey(s));
     }
+    for (const d of record.drawings) for (const f of d.facts) map.set(f.fact_id, drawingKey(d));
+    for (const m of record.models)
+      for (const f of m.features) map.set(modelFactId(m, f.feature_id), modelKey(m));
     return map;
   }, [record]);
 
-  // Jump to the sheet that holds the selected cell (derived during render, no effect needed).
-  const target = selectedCellId ? sheetOfCell.get(selectedCellId) : undefined;
+  // Jump to the tab that holds the selected fact (derived during render, no effect needed).
+  const target = selectedFactId ? tabOfFact.get(selectedFactId) : undefined;
   const [lastTarget, setLastTarget] = useState<string | undefined>(undefined);
   if (target && target !== lastTarget) {
     setLastTarget(target);
@@ -177,13 +229,13 @@ export function RecordViewer({
 
   useEffect(() => {
     const container = containerRef.current;
-    if (!selectedCellId || !container) return;
+    if (!selectedFactId || !container) return;
     let raf = 0;
     let tries = 0;
     // A freshly switched sheet mounts after its exit animation, so look for the cell for a
     // few frames before giving up.
     const locate = () => {
-      const el = container.querySelector<HTMLElement>(`[data-cell-id="${CSS.escape(selectedCellId)}"]`);
+      const el = container.querySelector<HTMLElement>(`[data-cell-id="${CSS.escape(selectedFactId)}"]`);
       if (!el) {
         if (tries++ < 45) raf = requestAnimationFrame(locate);
         return;
@@ -206,14 +258,33 @@ export function RecordViewer({
     };
     raf = requestAnimationFrame(locate);
     return () => cancelAnimationFrame(raf);
-  }, [selectedCellId, active]);
+  }, [selectedFactId, active]);
 
-  const current = record.sheets.find((s) => sheetKey(s) === active) ?? record.sheets[0];
+  const sheet = record.sheets.find((s) => sheetKey(s) === active);
+  const drawing = record.drawings.find((d) => drawingKey(d) === active);
+  const model = record.models.find((m) => modelKey(m) === active);
+  const showChecks = active === CHECKS && record.cross_checks.length > 0;
+  const current = sheet ?? (drawing || model || showChecks ? undefined : record.sheets[0]);
+  const activeKey = showChecks
+    ? CHECKS
+    : drawing
+      ? drawingKey(drawing)
+      : model
+        ? modelKey(model)
+        : current
+          ? sheetKey(current)
+          : firstTab;
   const cellCount = record.sheets.reduce((n, s) => n + s.rows.reduce((m, r) => m + r.cells.length, 0), 0);
+  const factCount = record.drawings.reduce((n, d) => n + d.facts.length, 0);
+  const featureCount = record.models.reduce(
+    (n, m) => n + m.features.filter((f) => f.kind !== "header").length,
+    0,
+  );
+  const disagreements = record.cross_checks.filter((c) => c.verdict === "disagree").length;
 
   return (
     <section
-      aria-label="Manufacturing record"
+      aria-label="Part record"
       className={cn(
         "flex min-h-0 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-white/10 dark:bg-zinc-900/70",
         className,
@@ -221,42 +292,135 @@ export function RecordViewer({
     >
       <div className="flex items-center justify-between gap-3 border-b border-zinc-200 px-4 py-2.5 dark:border-white/10">
         <p className="flex items-center gap-2 text-sm font-semibold">
-          <Table2 className="size-4 text-cyan-500" aria-hidden /> Manufacturing record
+          <Table2 className="size-4 text-cyan-500" aria-hidden /> Part record
         </p>
         <p className="font-mono text-[11px] text-zinc-500">
           {record.sheets.length} sheet{record.sheets.length === 1 ? "" : "s"} · {cellCount} cells
+          {record.drawings.length
+            ? ` · ${record.drawings.length} drawing${record.drawings.length === 1 ? "" : "s"} · ${factCount} facts`
+            : ""}
+          {record.models.length
+            ? ` · ${record.models.length} model${record.models.length === 1 ? "" : "s"} · ${featureCount} features`
+            : ""}
         </p>
       </div>
 
       <div className="overflow-x-auto border-b border-zinc-200 px-2 py-2 [scrollbar-width:none] dark:border-white/10">
         <AnimatedTabs
           label="Sheets"
-          value={sheetKey(current ?? record.sheets[0])}
+          value={activeKey}
           onChange={setActive}
           panelIdFor={() => panelId}
-          tabs={record.sheets.map((s) => ({
-            id: sheetKey(s),
-            ariaLabel: `${s.sheet} sheet in ${s.file}${s.hidden ? ", hidden sheet" : ""}`,
-            icon:
-              s.kind === "rows" ? (
-                <Rows3 className="size-3.5" aria-hidden />
-              ) : (
-                <FileSpreadsheet className="size-3.5" aria-hidden />
+          tabs={[
+            ...record.sheets.map((s) => ({
+              id: sheetKey(s),
+              ariaLabel: `${s.sheet} sheet in ${s.file}${s.hidden ? ", hidden sheet" : ""}${s.stale ? ", history" : ""}`,
+              icon:
+                s.kind === "rows" ? (
+                  <Rows3 className="size-3.5" aria-hidden />
+                ) : (
+                  <FileSpreadsheet className="size-3.5" aria-hidden />
+                ),
+              label: s.sheet,
+              meta: (
+                <>
+                  <span className="text-xs font-normal text-zinc-400">{s.file}</span>
+                  {s.hidden ? <EyeOff className="size-3.5" aria-hidden /> : null}
+                  {s.stale ? <History className="size-3.5 text-zinc-400" aria-hidden /> : null}
+                </>
               ),
-            label: s.sheet,
-            meta: (
-              <>
-                <span className="text-xs font-normal text-zinc-400">{s.file}</span>
-                {s.hidden ? <EyeOff className="size-3.5" aria-hidden /> : null}
-              </>
-            ),
-          }))}
+            })),
+            ...record.drawings.map((d) => ({
+              id: drawingKey(d),
+              ariaLabel: `Drawing ${d.file}${d.scanned && !d.readable ? ", scanned and not read yet" : ""}`,
+              icon: <FileText className="size-3.5" aria-hidden />,
+              label: d.file,
+              meta:
+                d.scanned && !d.readable ? (
+                  <ScanEye className="size-3.5 text-amber-500" aria-hidden />
+                ) : d.current_revision ? (
+                  <span className="text-xs font-normal text-zinc-400">Rev {d.current_revision}</span>
+                ) : null,
+            })),
+            ...record.models.map((m) => ({
+              id: modelKey(m),
+              ariaLabel: `3D model ${m.file}${m.valid ? "" : ", not a closed valid solid"}`,
+              icon: <Box className="size-3.5" aria-hidden />,
+              label: m.file,
+              meta: m.revision ? (
+                <span className="text-xs font-normal text-zinc-400">Rev {m.revision}</span>
+              ) : !m.valid ? (
+                <AlertTriangle className="size-3.5 text-amber-500" aria-hidden />
+              ) : null,
+            })),
+            ...(record.cross_checks.length
+              ? [
+                  {
+                    id: CHECKS,
+                    ariaLabel: `Cross-check, ${disagreements} disagreement${disagreements === 1 ? "" : "s"}`,
+                    icon: <ArrowLeftRight className="size-3.5" aria-hidden />,
+                    label: "Cross-check",
+                    meta: disagreements ? (
+                      <span className="rounded-full bg-rose-500 px-1.5 text-[10px] font-semibold text-white">
+                        {disagreements}
+                      </span>
+                    ) : null,
+                  },
+                ]
+              : []),
+          ]}
         />
       </div>
 
       <div ref={containerRef} id={panelId} role="tabpanel" className="min-h-0 flex-1 overflow-y-auto p-4">
         <AnimatePresence mode="wait" initial={false}>
-          {current ? (
+          {showChecks ? (
+            <motion.div
+              key={CHECKS}
+              className="flex flex-col gap-3"
+              initial={{ opacity: 0, x: 12 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -12 }}
+              transition={{ duration: 0.2 }}
+            >
+              <p className="text-xs text-zinc-500">
+                The app compares the spreadsheet, the drawing and the 3D model field by field, converting
+                units only when the files state them. When two files agree and one differs, the one that
+                differs is marked. Nothing is corrected: every value stays cited.
+              </p>
+              <CrossCheckList checks={record.cross_checks} onSelect={onSelectFact} filterable />
+            </motion.div>
+          ) : model ? (
+            <motion.div
+              key={modelKey(model)}
+              initial={{ opacity: 0, x: 12 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -12 }}
+              transition={{ duration: 0.2 }}
+            >
+              <ModelPanel
+                partNumber={record.part_key}
+                model={model}
+                checks={record.cross_checks}
+                onSelect={onSelectFact}
+              />
+            </motion.div>
+          ) : drawing ? (
+            <motion.div
+              key={drawingKey(drawing)}
+              initial={{ opacity: 0, x: 12 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -12 }}
+              transition={{ duration: 0.2 }}
+            >
+              <DrawingViewer
+                partNumber={record.part_key}
+                drawing={drawing}
+                selected={selectedFactId}
+                onSelect={onSelectFact}
+              />
+            </motion.div>
+          ) : current ? (
             <motion.div
               key={sheetKey(current)}
               className="flex flex-col gap-4"
@@ -270,21 +434,29 @@ export function RecordViewer({
                   <p className="mb-1 font-medium tracking-wide uppercase">Sheet title / banner</p>
                   {current.banner.map((b) => (
                     <p key={b.cell_id}>
-                      <CellText cell={b} selected={selectedCellId === b.cell_id} />
+                      <CellText cell={b} selected={selectedFactId === b.cell_id} />
                     </p>
                   ))}
                 </div>
               ) : null}
+              {current.stale ? (
+                <p className="flex gap-2 rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-xs text-zinc-600 dark:border-white/10 dark:bg-white/[0.03] dark:text-zinc-400">
+                  <History className="size-4 shrink-0" aria-hidden />
+                  History: {current.stale_reason ?? "archived data"}. Shown for reference; answers never use
+                  it as the current value.
+                </p>
+              ) : null}
               <p className="text-xs text-zinc-500">
-                Header on row {current.header_row} ·{" "}
+                {current.layout === "card" ? "Vertical part card" : `Header on row ${current.header_row}`} ·{" "}
                 {current.kind === "rows"
                   ? `${current.rows.length} row${current.rows.length === 1 ? "" : "s"} for this part`
                   : "one record row for this part"}
+                {current.default_unit ? ` · units ${current.default_unit} unless stated` : ""}
               </p>
               {current.kind === "rows" ? (
-                <RowsTable sheet={current} selected={selectedCellId} />
+                <RowsTable sheet={current} selected={selectedFactId} />
               ) : (
-                <AttributeTable sheet={current} selected={selectedCellId} />
+                <AttributeTable sheet={current} selected={selectedFactId} />
               )}
             </motion.div>
           ) : (

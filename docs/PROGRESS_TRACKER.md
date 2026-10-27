@@ -32,6 +32,54 @@ Status key: `todo` · `doing` · `done` · `blocked` · `cut`
 | 21 | 5 | Enterprise frontend redesign: animated, responsive, 21st.dev component set | done | Spec in `docs/FRONTEND_DESIGN.md`. Grid Beam and AI Chat Input retrieved from 21st.dev; the rest written in their style (free tier allows 2 retrievals a day). Verified in Chrome at desktop and phone widths, dark and light, with a live Groq answer |
 | 22 | 5 | Fix double unit conversion in compute (`c1 / 25.4` plus `unit_out: in` gave 0.1938 in for Ø125) | todo | Found in the live UI. Reject or neutralise conversion constants when `unit_out` is set, and tell the model not to put factors in the expression |
 
+## Level 2 (PDF drawings)
+
+Plan: [PLAN_LEVEL2.md](PLAN_LEVEL2.md). Branch `level2-pdf-drawings`. Both datasets are used:
+the synthetic set (2280–2284, two workbooks, four drawings) and batch 2 (3001–3004, the messy
+workshop export, four drawings including a scan and a two-sheet revision package).
+
+| WP | Task | Status | Notes |
+|---|---|---|---|
+| 0 | Messy workbook hardening | done | Identity keys (`P-3001`, `003003`, `3001` are one part), separator rows, vertical part cards, archive sheets and superseded revisions as history, sheet banner units, hours columns |
+| 1 | Source-neutral `Fact` evidence model | done | `fact_id` replaces `cell_id`; old answers still load. ADR 0006 |
+| 2 | PDF extraction | done | pdfplumber words, rotated text, ruled tables, page orientation; title block (compound labels, `SEE NOTE n`), notes, typed dimension callouts, revision table; scanned / protected / damaged / oversized / active-content guards |
+| 3 | Storage, migration 0002, file store, API | done | Content-addressed PDF store, pages rendered to PNG on demand, `drawing_fact` table, `cnc rebuild`, `cnc reset-drawing` |
+| 4 | Cross-check engine | done | Deterministic verdicts per field with unit resolution; never `disagree` on an ambiguous unit. ADR 0007 |
+| 5 | Prompt, verifier, offline rules for drawings | done | `<drawing>` and `<cross_checks>` blocks, 13 system rules; file and sheet names no longer count as unsupported numbers |
+| 6 | Consent-gated vision for scans | done | `needs_consent` + `read_scan` action; Anthropic, Claude Code and static readers; values labelled `vision`. ADR 0008. Verified live on 3001 with Claude |
+| 7 | Frontend | done | Drawing tab with rendered page and clickable callout boxes, cross-check tab, PDF / vision / history chips, consent button, scanned badge, `reading_scan` stage; verified in Chrome, light and dark |
+| 8 | Golden set, eval, docs | done | 22 Level 2 golden rows (64 total), `needs_consent` scored as a deferral, verdict assertions, "answer names its file" metric; README, ADRs 0006–0008 |
+
+Every planted case in both answer keys is reproduced: 2280 and 2281 agree; 2282 agrees after
+inch conversion and Ra/RMS convention; 2283 material and OD disagree; 3001 is a scan that needs
+consent; 3002 Rev A is history; 3003 material comes from note 3 and the hole count disagrees
+(part card 6, master list and drawing 4); 3004 agrees after conversion; 2284 has no drawing.
+
+## Level 3 (IGES 3D models)
+
+Plan: [PLAN_LEVEL3.md](PLAN_LEVEL3.md). Branch `level3-iges-models`. Write-up:
+[TECHNICAL.md](TECHNICAL.md). Architecture diagrams:
+https://claude.ai/artifact/5ExmHbL4b9mhVomByiJCad
+
+| WP | Task | Status | Notes |
+|---|---|---|---|
+| 0 | Kernel and worker | done | `cadquery-ocp-novtk==8.0.1.1.0`; spawned worker with timeout and memory cap (Job Object on Windows, `RLIMIT_AS` on Linux); crash and timeout recycle the pool; IGES detected by record structure. ADR 0009 |
+| 1 | Reading | done | Global header as text (units, scale, dates); lengths converted to mm; sewing; topology: solid / several solids / open shell / curves |
+| 2 | Features | done | Cylinder recognition (native, revolved line, B-spline within 1e-4 mm), hole vs boss, through vs blind, steps, bores, counterbores, circular / grid / row patterns, envelope in the part frame (from flat faces; OCC's "optimal" OBB proved inexact), chamfers, fillets, volume, area |
+| 3 | Storage and linking | done | Migration 0003 (`model_fact`, model fragments); linking by header then file name; revision from file name; older models history; `cnc reprocess` |
+| 4 | Artifacts and API | done | glTF per feature, two LODs; exact HLR SVG projections with clickable markers; mesh and view routes, immutable, versioned URLs, SVG under strict CSP |
+| 5 | Three-way cross-check | done | Pairwise verdicts, odd one out, dissent ids, within_tolerance, consistent (stock), not_modelled (chamfers), ISO 261 tap drill. ADR 0010 |
+| 6 | Answers | done | `<model>` prompt block with methods; rule 7 (a model never states material, tolerance, finish, threads, weight); offline rules engine model-aware. ADR 0011 |
+| 7 | Frontend | done | three.js viewer (section, presets, edges, fine mesh, theme, reduced motion, WebGL fallback), projections, model tab, linked selection across the three files, Compare view, three-column cross-check with filter; checked in Chrome light, dark and phone width |
+| 8 | Golden set, docs | done | 16 Level 3 golden rows (80 total); N07 now answerable; README, TECHNICAL.md, ADRs 0009–0011 |
+
+Every planted case is reproduced, with no false disagreement elsewhere (API test): 2283 OD (job
+card odd one out) and material; 3003 holes (part card dissents); 3002 M6 by tap drill; 2282 and
+3004 after conversion; 2281 chamfer not modelled; every part fits its stock. The sample models
+were generated from the answer keys, so tests also build other-exporter shapes at test time.
+Docker image and CI install the GL runtime libraries the Linux kernel wheel needs; the container
+build was not run on the development machine (no Docker CLI there).
+
 ## Acceptance checklist (Level 1)
 
 - [x] Any part number in any ingested workbook resolves (2280–2284 from both workbooks)
@@ -60,27 +108,33 @@ Status key: `todo` · `doing` · `done` · `blocked` · `cut`
 | 2026-10-27 | Browser talks to a Next route handler proxy, not FastAPI directly | No CORS; rewrites would buffer SSE |
 | 2026-10-27 | `claude_code` provider: Claude via the official CLI on a personal subscription, internal testing only | Subscription tokens are refused by the raw API; pattern taken from EM-AI-FACTORY (ADR 0005). Production stays on `ANTHROPIC_API_KEY` |
 | 2026-10-27 | Numbers in rows the answer cites are linked, not flagged | Real model run flagged "Op 20" as ungrounded; invented numbers elsewhere are still flagged |
+| 2026-10-27 | Excel-vs-PDF cross-check lands in Level 2, computed in code | User choice; a model comparing free text "corrects" values (ADR 0007) |
+| 2026-10-27 | Scanned PDFs: tell the user, read with a vision model only after a yes | User choice (ADR 0008) |
+| 2026-10-27 | Services run natively (PostgreSQL 18 on 5433), not in Docker, on the dev machine | User instruction; tests use `DATABASE_URL_TEST` |
 
 ## How to run (current state)
 
+Native services on the dev machine (PostgreSQL 18 on port 5433, role and databases `cnc`,
+`cnc_test`):
+
 ```
-docker compose up -d db                      # Postgres 18 on host port 5434 (+ cnc_test database)
 cd backend && uv sync
 uv run alembic upgrade head
-uv run cnc ingest ../data                    # idempotent
-uv run cnc serve                             # http://127.0.0.1:8000/docs
-uv run pytest -q                             # 141 tests, no API keys needed
-uv run cnc eval --provider fake --out ../docs/eval/offline-rules.md
-cd ../frontend && pnpm install && pnpm dev   # http://localhost:3000
-uv run python scripts/smoke.py              # from backend/, against a running API
+uv run cnc ingest ../data                    # idempotent; workbooks and drawings
+PYTHONUTF8=1 uv run cnc serve --port 8000    # http://127.0.0.1:8000/docs
+DATABASE_URL_TEST=postgresql+psycopg://cnc:cnc@localhost:5433/cnc_test uv run pytest -q   # 264 tests
+uv run cnc eval --provider claude_code --out ../docs/eval/claude-code.md                 # 64/64
+uv run cnc reset-drawing ../data/3001_gear_blank_scan.pdf   # forget a vision reading of the scan
+cd ../frontend && pnpm install && pnpm dev   # http://localhost:3000; pnpm test (24)
 ```
 
 ## Next up
 
-1. Add `ANTHROPIC_API_KEY` and `GROQ_API_KEY` to `backend/.env`, run `just eval anthropic` and `just eval groq`, fix any prompt issues the per-question table shows, and put the numbers in the README table.
-2. Live failover demo: start with an unreachable Anthropic endpoint and confirm the answer footer shows the Groq fallback.
-3. Optional: Playwright smoke test of the UI (pick part, ask, chip highlights the cell).
-4. Then Level 2: PDF title block and dimension extraction.
+1. Push: `gh auth refresh -h github.com -s workflow`, then push `main` and the
+   `level2-pdf-drawings` branch and open a PR.
+2. Re-run the Groq eval on the 64-question set (`uv run cnc eval --provider groq`, ~10 min at the
+   free-tier pace) and update the README table.
+3. Level 3: IGES bounding box, hole count and diameters as facts; three-way cross-check.
 
 ## Open items / blockers
 

@@ -1,8 +1,8 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import type { AskResult } from "@/lib/api/schemas";
-import { AnswerCard } from "./answer-card";
+import type { AskResult, Evidence } from "@/lib/api/schemas";
+import { AnswerCard, previewSources } from "./answer-card";
 
 vi.mock("next/link", () => ({
   default: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => (
@@ -24,12 +24,16 @@ const base: AskResult = {
   suggestions: [],
   confidence: "high",
   sources: {},
+  cross_checks: [],
+  actions: [],
   warnings: [],
 };
 
-const evidence = {
-  cell_id: "mfg_record_A!Parts!C2",
+const evidence: Evidence = {
+  fact_id: "mfg_record_A!Parts!C2",
+  source: "excel",
   file: "mfg_record_A.xlsx",
+  locator: "Parts › C2",
   sheet: "Parts",
   cell: "C2",
   row: 2,
@@ -38,7 +42,27 @@ const evidence = {
   value: "SS304",
   quoted: "SS304",
   hidden: false,
+  stale: false,
+  confidence: "exact",
   auto_linked: false,
+};
+
+const drawingEvidence: Evidence = {
+  fact_id: "2283_bushing!p1!dim!2",
+  source: "pdf",
+  file: "2283_bushing.pdf",
+  locator: "p1 › Dimension › Diameter",
+  header: "Diameter",
+  canonical: null,
+  value: "Ø48",
+  quoted: "Ø48",
+  hidden: false,
+  stale: false,
+  confidence: "exact",
+  auto_linked: false,
+  page: 1,
+  region: "dimension",
+  bbox: [218.2, 321.1, 235.3, 330.1],
 };
 
 describe("AnswerCard", () => {
@@ -51,9 +75,146 @@ describe("AnswerCard", () => {
 
   it("selects the cited cell when a chip is clicked", async () => {
     const onSelect = vi.fn();
-    render(<AnswerCard result={{ ...base, evidence: [evidence] }} onSelectCell={onSelect} />);
+    render(<AnswerCard result={{ ...base, evidence: [evidence] }} onSelectFact={onSelect} />);
     await userEvent.click(screen.getByRole("button", { name: /C2/ }));
     expect(onSelect).toHaveBeenCalledWith("mfg_record_A!Parts!C2");
+  });
+
+  it("names the drawing file, page and callout for a PDF source", async () => {
+    const onSelect = vi.fn();
+    render(
+      <AnswerCard result={{ ...base, evidence: [evidence, drawingEvidence] }} onSelectFact={onSelect} />,
+    );
+    const chip = screen.getByRole("button", { name: /2283_bushing\.pdf › p1 › Dimension › Diameter/ });
+    expect(chip).toHaveTextContent("Ø48");
+    await userEvent.click(chip);
+    expect(onSelect).toHaveBeenCalledWith("2283_bushing!p1!dim!2");
+  });
+
+  it("shows a few sources and a See all button for the rest", async () => {
+    const many = Array.from({ length: 7 }, (_, i) => ({
+      ...evidence,
+      fact_id: `mfg_record_A!Parts!C${i + 2}`,
+      locator: `Parts › C${i + 2}`,
+      cell: `C${i + 2}`,
+    }));
+    render(<AnswerCard result={{ ...base, evidence: many }} />);
+    expect(screen.getAllByRole("button", { name: /mfg_record_A\.xlsx › Parts/ })).toHaveLength(4);
+    const toggle = screen.getByRole("button", { name: /See all 7 sources/ });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await userEvent.click(toggle);
+    expect(await screen.findAllByRole("button", { name: /mfg_record_A\.xlsx › Parts/ })).toHaveLength(7);
+    await userEvent.click(screen.getByRole("button", { name: /Show fewer/ }));
+    expect(screen.getByRole("button", { name: /See all 7 sources/ })).toBeInTheDocument();
+  });
+
+  it("does not offer See all when every source fits", () => {
+    render(<AnswerCard result={{ ...base, evidence: [evidence, drawingEvidence] }} />);
+    expect(screen.queryByRole("button", { name: /See all/ })).not.toBeInTheDocument();
+  });
+
+  it("keeps a drawing source in the preview when the spreadsheet cites more", () => {
+    const cells = Array.from({ length: 5 }, (_, i) => ({ ...evidence, fact_id: `x!Parts!C${i}` }));
+    const preview = previewSources([...cells, drawingEvidence]);
+    expect(preview).toHaveLength(4);
+    expect(preview.map((e) => e.source)).toContain("pdf");
+    expect(preview.at(-1)?.fact_id).toBe(drawingEvidence.fact_id); // answer order kept
+  });
+
+  it("opens the full list when the highlighted source is one of the hidden ones", () => {
+    const many = Array.from({ length: 6 }, (_, i) => ({ ...evidence, fact_id: `x!Parts!C${i}` }));
+    render(<AnswerCard result={{ ...base, evidence: many }} selectedFactId="x!Parts!C5" />);
+    expect(screen.getAllByRole("button", { name: /mfg_record_A\.xlsx/ })).toHaveLength(6);
+  });
+
+  it("labels values read from a scan by the vision model", () => {
+    render(<AnswerCard result={{ ...base, evidence: [{ ...drawingEvidence, confidence: "vision" }] }} />);
+    expect(screen.getByLabelText("read by vision model")).toBeInTheDocument();
+  });
+
+  it("asks before reading a scanned drawing and sends the approval reply", async () => {
+    const onAction = vi.fn();
+    const action = {
+      id: "read_scan" as const,
+      file: "3001_gear_blank_scan.pdf",
+      label: "Read 3001_gear_blank_scan.pdf with the vision model",
+      reply: "Yes, read the scanned drawing.",
+    };
+    render(
+      <AnswerCard
+        result={{
+          ...base,
+          status: "needs_consent",
+          answer: "The drawing is a scanned image that the app has not read.",
+          confidence: "low",
+          actions: [action],
+        }}
+        onAction={onAction}
+      />,
+    );
+    expect(screen.getByText("Needs your go-ahead")).toBeInTheDocument();
+    const button = screen.getByRole("button", { name: action.label });
+    await userEvent.click(button);
+    expect(onAction).toHaveBeenCalledWith(action);
+    expect(screen.getByRole("button", { name: "Reading the scan…" })).toBeDisabled();
+  });
+
+  it("does not offer the action while another question is running", () => {
+    render(
+      <AnswerCard
+        result={{
+          ...base,
+          actions: [{ id: "read_scan", file: "a.pdf", label: "Read a.pdf", reply: "Yes" }],
+        }}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Read a.pdf" })).toBeDisabled();
+  });
+
+  it("shows spreadsheet and drawing values side by side, disagreements first", () => {
+    render(
+      <AnswerCard
+        result={{
+          ...base,
+          cross_checks: [
+            {
+              field: "bore",
+              label: "Bore",
+              verdict: "agree",
+              excel: ["job_cards_B!Job Cards!E5"],
+              pdf: ["2283_bushing!p1!dim!3"],
+              excel_value: "Ø30",
+              pdf_value: "Ø30",
+              detail: "Both say Ø30.",
+              iges: [],
+              sides: [],
+              pairs: {},
+              dissent: [],
+            },
+            {
+              field: "outer_diameter",
+              label: "Outer diameter",
+              verdict: "disagree",
+              excel: ["job_cards_B!Job Cards!E5"],
+              pdf: ["2283_bushing!p1!dim!2"],
+              excel_value: "Ø50",
+              pdf_value: "Ø48",
+              detail: "Different diameters.",
+              iges: [],
+              sides: [],
+              pairs: {},
+              dissent: [],
+            },
+          ],
+        }}
+      />,
+    );
+    const items = screen.getAllByRole("listitem");
+    expect(items[0]).toHaveTextContent("Outer diameter");
+    expect(items[0]).toHaveTextContent("Disagree");
+    expect(items[0]).toHaveTextContent("Ø50");
+    expect(items[0]).toHaveTextContent("Ø48");
+    expect(items[1]).toHaveTextContent("Agree");
   });
 
   it("renders not-found answers with what the record does contain", () => {

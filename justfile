@@ -22,13 +22,17 @@ install:
 migrate:
     cd backend; uv run alembic upgrade head
 
-# Ingest every spreadsheet under data/ (idempotent)
+# Ingest every spreadsheet, drawing and IGES model under data/ (idempotent)
 ingest:
     cd backend; uv run cnc ingest ../data
 
 # Run the API on :8000 (offline rules engine unless API keys are set in backend/.env)
 api:
     cd backend; uv run cnc serve --reload
+
+# Re-measure stored IGES models with the current extractor (after an upgrade)
+reprocess:
+    cd backend; uv run cnc reprocess
 
 # Run the web app on :3000
 web:

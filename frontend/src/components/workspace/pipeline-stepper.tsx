@@ -18,6 +18,7 @@ type Stage = StageEvent["stage"];
 const LABEL: Record<Stage, string> = {
   validating: "Checking the question",
   loading_record: "Loading the part record",
+  reading_scan: "Reading the scanned drawing with the vision model",
   asking_llm: "Asking the model",
   verifying: "Verifying every citation against the file",
   computing: "Computing from the cited cells",
@@ -38,10 +39,12 @@ function useElapsed() {
 export function PipelineStepper({ events }: { events: StageEvent[] }) {
   const elapsed = useElapsed();
   const seen = events.map((e) => e.stage);
-  // "computing" only happens for calculated answers; show it once the server reports it.
-  const order: Stage[] = seen.includes("computing")
-    ? ["validating", "loading_record", "asking_llm", "verifying", "computing", "saving"]
-    : BASE;
+  // Optional steps (reading a scan, computing) appear once the server reports them.
+  const order: Stage[] = BASE.flatMap((s): Stage[] => {
+    if (s === "loading_record" && seen.includes("reading_scan")) return [s, "reading_scan"];
+    if (s === "verifying" && seen.includes("computing")) return [s, "computing"];
+    return [s];
+  });
   const current = seen.at(-1);
   const currentIndex = current ? order.indexOf(current) : -1;
   const detail = (stage: Stage) => events.findLast((e) => e.stage === stage)?.detail;
@@ -67,7 +70,7 @@ export function PipelineStepper({ events }: { events: StageEvent[] }) {
         <AnimatePresence initial={false}>
           {order.map((stage, i) => {
             const state = i < currentIndex ? "done" : i === currentIndex ? "current" : "pending";
-            const extra = stage === "asking_llm" ? detail(stage) : null;
+            const extra = stage === "asking_llm" || stage === "reading_scan" ? detail(stage) : null;
             return (
               <motion.li
                 key={stage}

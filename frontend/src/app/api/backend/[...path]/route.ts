@@ -7,7 +7,14 @@ import type { NextRequest } from "next/server";
  */
 const BACKEND_URL = process.env.BACKEND_URL ?? "http://127.0.0.1:8000";
 const FORWARD_REQUEST = ["content-type", "accept", "x-request-id"];
-const FORWARD_RESPONSE = ["content-type", "x-request-id", "cache-control"];
+const FORWARD_RESPONSE = [
+  "content-type",
+  "x-request-id",
+  "cache-control",
+  "etag",
+  "content-security-policy",
+  "x-content-type-options",
+];
 
 async function forward(req: NextRequest, ctx: RouteContext<"/api/backend/[...path]">) {
   const { path } = await ctx.params;

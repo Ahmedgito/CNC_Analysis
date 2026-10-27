@@ -64,8 +64,8 @@ def _truncate(db_url: str) -> None:
     with engine.begin() as conn:
         conn.execute(
             text(
-                "TRUNCATE llm_call, message, conversation, part, part_fragment, cell, ingest_run "
-                "RESTART IDENTITY CASCADE"
+                "TRUNCATE llm_call, message, conversation, part, part_fragment, cell, "
+                "drawing_fact, model_fact, ingest_run RESTART IDENTITY CASCADE"
             )
         )
     engine.dispose()
@@ -78,11 +78,15 @@ def make_test_settings(db_url: str, data_dir: Path, **overrides):
         "app_env": "test",
         "database_url": db_url,
         "data_dir": data_dir,
+        "store_dir": data_dir / ".store",
         "auto_ingest": False,
         "llm_primary_provider": "fake",
         "llm_fallback_provider": "none",
         "anthropic_api_key": None,
         "groq_api_key": None,
+        # The kernel runs in-process in tests (fast, debuggable); test_geometry_worker.py covers
+        # the isolated process pool the API uses.
+        "geometry_inline": True,
         **overrides,
     }
     return Settings(_env_file=None, **values)  # type: ignore[call-arg]

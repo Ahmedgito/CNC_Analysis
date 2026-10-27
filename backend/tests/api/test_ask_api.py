@@ -24,7 +24,7 @@ def ask(client, pn: str, question: str, **body):
 
 
 def cell_ids(result) -> list[str]:
-    return [e["cell_id"] for e in result["evidence"]]
+    return [e["fact_id"] for e in result["evidence"]]
 
 
 # ------------------------------------------------------------------ offline provider, seeded
@@ -172,10 +172,10 @@ class Liar:
     async def answer(self, prompt: Prompt) -> ProviderResult:
         self.calls += 1
         if self.mode == "wrong_value":
-            ev = [EvidenceItem(cell_id="mfg_record_A!Parts!C2", quoted_value="Titanium Grade 5")]
+            ev = [EvidenceItem(fact_id="mfg_record_A!Parts!C2", quoted_value="Titanium Grade 5")]
             text = "It is made of Titanium Grade 5."
         else:
-            ev = [EvidenceItem(cell_id="mfg_record_A!Parts!C2", quoted_value="SS304")]
+            ev = [EvidenceItem(fact_id="mfg_record_A!Parts!C2", quoted_value="SS304")]
             text = "It is SS304 and weighs 1.85 kg."
         draft = AnswerDraft(
             status="answered",
@@ -211,7 +211,7 @@ def test_fabricated_citation_is_withheld(db_url, tmp_path):
     assert liar.calls == 2  # re-asked once with the verifier's errors
     assert r["status"] == "not_found"
     assert "Titanium" not in r["answer"]
-    assert r["verification"]["dropped"][0]["cell_id"] == "mfg_record_A!Parts!C2"
+    assert r["verification"]["dropped"][0]["fact_id"] == "mfg_record_A!Parts!C2"
 
 
 def test_invented_number_flagged_low_confidence(db_url, tmp_path):
@@ -221,7 +221,7 @@ def test_invented_number_flagged_low_confidence(db_url, tmp_path):
     assert r["status"] == "answered"
     assert r["confidence"] == "low"
     assert r["verification"]["unsupported_numbers"] == ["1.85"]
-    assert any("not in the cited cells" in w for w in r["warnings"])
+    assert any("not in the cited sources" in w for w in r["warnings"])
 
 
 def test_failover_to_second_provider_is_visible(db_url, tmp_path):

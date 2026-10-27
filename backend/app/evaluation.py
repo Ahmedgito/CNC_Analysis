@@ -19,7 +19,34 @@ from pathlib import Path
 from app.ingestion.cells import normalize_for_match
 
 GOLDEN = Path(__file__).resolve().parent.parent / "evals" / "golden.jsonl"
-ABSTAIN = {"not_found", "blocked", "clarify", "part_not_found", "invalid_question"}
+# Statuses that decline to state a value. needs_consent defers until the user agrees to a scan
+# being read, so answering instead (guessing what an unread scan says) counts as wrong.
+ABSTAIN = {"not_found", "blocked", "clarify", "needs_consent", "part_not_found", "invalid_question"}
+# Golden-set categories that need the PDF drawings (Level 2).
+LEVEL2 = {
+    "drawing_lookup",
+    "notes_pointer",
+    "cross_agree",
+    "cross_unit",
+    "cross_disagree",
+    "revision",
+    "scanned",
+    "missing_pdf",
+    "stale_excel",
+    "identity",
+}
+# Golden-set categories that need the IGES models (Level 3).
+LEVEL3 = {
+    "model_lookup",
+    "three_agree",
+    "three_unit",
+    "three_disagree",
+    "convention",
+    "stock",
+    "scan_plus_model",
+    "missing_model",
+    "model_limits",
+}
 
 
 @dataclass(slots=True)
@@ -40,6 +67,7 @@ class RowResult:
     provider: str | None
     answer: str
     notes: list[str] = field(default_factory=list)
+    names_file: bool | None = None  # the answer text names a file it cites
     raw: dict = field(default_factory=dict)  # the full API result, so rows can be rescored offline
 
 
@@ -47,6 +75,11 @@ def load_golden(path: Path = GOLDEN) -> list[dict]:
     return [
         json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()
     ]
+
+
+def _fact_id(evidence: dict) -> str:
+    """Evidence ids are ``fact_id`` since Level 2; saved Level 1 results used ``cell_id``."""
+    return evidence.get("fact_id") or evidence["cell_id"]
 
 
 def score_row(row: dict, result: dict, latency_ms: int) -> RowResult:
@@ -78,25 +111,43 @@ def score_row(row: dict, result: dict, latency_ms: int) -> RowResult:
         if normalize_for_match(s) in text:
             content_ok = False
             notes.append(f"forbidden '{s}' present")
+    # Cross-check verdicts the answer must carry, e.g. {"outer_diameter": "disagree"}.
+    if "verdicts" in row:
+        got = {c.get("field"): c.get("verdict") for c in result.get("cross_checks", [])}
+        for field_name, verdict in row["verdicts"].items():
+            if got.get(field_name) != verdict:
+                content_ok = False
+                notes.append(f"{field_name} verdict {got.get(field_name)} != {verdict}")
 
     evidence = result.get("evidence", [])
-    cited = [e["cell_id"] for e in evidence]
+    cited = [_fact_id(e) for e in evidence]
     recall = precision = None
-    if row.get("cells"):
-        expected = set(row["cells"])
+    names_file = None
+    if evidence and status in ("answered", "computed"):
+        # "Every answer states which file it came from": the text itself, not only the chips.
+        files = {e["file"] for e in evidence} | {e["file"].rsplit(".", 1)[0] for e in evidence}
+        names_file = any(normalize_for_match(f) in text for f in files)
+    expected_ids = row.get("facts") or row.get("cells")
+    if expected_ids:
+        expected = set(expected_ids)
         # Precision counts a citation as justified when the golden set lists it, when it identifies
         # the part the answer names (part number / description), or when the verifier linked it
         # because the answer quotes that cell's value verbatim. Anything else lowers precision.
         justified = {
-            e["cell_id"]
+            _fact_id(e)
             for e in evidence
             if e.get("auto_linked") or e.get("canonical") in ("part_number", "description")
         }
-        acceptable = expected | set(row.get("acceptable_cells", [])) | justified
+        acceptable = (
+            expected
+            | set(row.get("acceptable_facts", []))
+            | set(row.get("acceptable_cells", []))
+            | justified
+        )
         recall = len(expected & set(cited)) / len(expected)
         precision = (len([c for c in cited if c in acceptable]) / len(cited)) if cited else 0.0
         if recall < 1:
-            notes.append(f"missed cells {sorted(expected - set(cited))}")
+            notes.append(f"missed facts {sorted(expected - set(cited))}")
     passed = status_ok and content_ok is not False and (recall is None or recall == 1.0)
     return RowResult(
         id=row["id"],
@@ -115,6 +166,7 @@ def score_row(row: dict, result: dict, latency_ms: int) -> RowResult:
         provider=(result.get("provider") or {}).get("model"),
         answer=answer,
         notes=notes,
+        names_file=names_file,
         raw=result,
     )
 
@@ -129,6 +181,10 @@ def summarise(rows: list[RowResult]) -> dict:
     with_cells = [r for r in rows if r.recall is not None and r.status in ("answered", "computed")]
     llm_rows = [r for r in rows if r.status not in ("part_not_found", "invalid_question")]
     recalls = [r.recall for r in with_cells if r.recall is not None]
+    # Level 3 rows (M..) reuse some Level 2 category names (revision, identity); count them once.
+    level3 = [r for r in rows if r.category in LEVEL3 or r.id.startswith("M")]
+    level2 = [r for r in rows if r.category in LEVEL2 and r not in level3]
+    named = [r for r in rows if r.names_file is not None]
     precisions = [r.precision for r in with_cells if r.precision is not None]
     return {
         "rows": len(rows),
@@ -143,6 +199,12 @@ def summarise(rows: list[RowResult]) -> dict:
         "answered_incorrectly": len(wrong),
         "citation_recall": statistics.mean(recalls) if recalls else None,
         "citation_precision": statistics.mean(precisions) if precisions else None,
+        "level2_rows": len(level2),
+        "level2_passed": sum(r.passed for r in level2),
+        "level3_rows": len(level3),
+        "level3_passed": sum(r.passed for r in level3),
+        "answers_with_sources": len(named),
+        "answers_naming_file": sum(bool(r.names_file) for r in named),
         "latency_ms_median": statistics.median(r.latency_ms for r in llm_rows)
         if llm_rows
         else None,
@@ -169,6 +231,9 @@ def render_markdown(provider: str, model: str, summary: dict, rows: list[RowResu
         f"| Abstain precision / recall | {_pct(s['abstain_precision'])} / {_pct(s['abstain_recall'])} |",
         f"| Answered incorrectly (wrong content, or answered when it should abstain) | {s['answered_incorrectly']} |",
         f"| Citation recall / precision (answered rows)¹ | {_pct(s['citation_recall'])} / {_pct(s['citation_precision'])} |",
+        f"| Level 2 questions (drawings, cross-checks, scans) passed | {s.get('level2_passed', 0)} / {s.get('level2_rows', 0)} |",
+        f"| Level 3 questions (3D models, three-way checks) passed | {s.get('level3_passed', 0)} / {s.get('level3_rows', 0)} |",
+        f"| Answers whose text names the file they came from | {s.get('answers_naming_file', 0)} / {s.get('answers_with_sources', 0)} |",
         "| Citations that failed verification but were shown | 0 (verifier guarantees) |",
         f"| Median latency | {s['latency_ms_median'] or 0:.0f} ms |",
         "",
@@ -187,10 +252,10 @@ def render_markdown(provider: str, model: str, summary: dict, rows: list[RowResu
         "",
         "</details>",
         "",
-        "¹ Recall: share of the golden set's expected cells that the answer cites. Precision: share of "
-        "cited cells that are justified, meaning listed in the golden set, identifying the part the "
-        "answer names (part number or description), or linked by the verifier because the answer "
-        "quotes that cell's value verbatim.",
+        "¹ Recall: share of the golden set's expected facts (spreadsheet cells or drawing callouts) "
+        "that the answer cites. Precision: share of cited facts that are justified, meaning listed in "
+        "the golden set, identifying the part the answer names (part number or description), or "
+        "linked by the verifier because the answer quotes that fact's value verbatim.",
         "",
     ]
     return "\n".join(lines)

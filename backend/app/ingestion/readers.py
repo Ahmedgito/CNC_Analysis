@@ -16,11 +16,14 @@ from typing import Literal
 
 from app.ingestion.cells import RawCell, Sheet, ValueType, Workbook
 
-FileFormat = Literal["xlsx", "xls", "csv"]
+FileFormat = Literal["xlsx", "xls", "csv", "pdf", "iges"]
 
 _ZIP_MAGIC = b"PK\x03\x04"
 _OLE_MAGIC = b"\xd0\xcf\x11\xe0"
-SUPPORTED_SUFFIXES = {".xlsx", ".xlsm", ".xls", ".csv"}
+SUPPORTED_SUFFIXES = {".xlsx", ".xlsm", ".xls", ".csv", ".pdf", ".igs", ".iges"}
+_IGES_SUFFIXES = (".igs", ".iges")
+_STEP_SUFFIXES = (".step", ".stp", ".p21")
+_PDF_MAGIC = b"%PDF-"
 _CSV_NUMBER_RE = re.compile(r"^-?\d+(\.\d+)?$")
 _SCALAR_TYPES = (str, int, float, bool, datetime, date, time)
 
@@ -30,6 +33,26 @@ class UnsupportedFileError(ValueError):
 
 
 def sniff_format(data: bytes, file_name: str) -> FileFormat:
+    # The PDF header may follow up to 1 KB of junk; it must be checked before the text heuristic,
+    # which would otherwise take a PDF for a CSV file.
+    if _PDF_MAGIC in data[:1024]:
+        return "pdf"
+    if file_name.lower().endswith(".pdf"):
+        raise UnsupportedFileError(f"{file_name}: named .pdf but the content is not a PDF")
+    # IGES is recognised by its 80-column record structure, so this runs before the CSV
+    # heuristic (an IGES file is plain text too).
+    from app.geometry.header import looks_like_iges
+
+    if looks_like_iges(data):
+        return "iges"
+    lower = file_name.lower()
+    if lower.endswith(_IGES_SUFFIXES):
+        raise UnsupportedFileError(
+            f"{file_name}: named IGES but the content is not ASCII IGES (binary and compressed "
+            "IGES are not supported)"
+        )
+    if lower.endswith(_STEP_SUFFIXES) or data[:16].startswith(b"ISO-10303-21"):
+        raise UnsupportedFileError(f"{file_name}: STEP models are not supported yet; export IGES")
     if data.startswith(_ZIP_MAGIC):
         return "xlsx"
     if data.startswith(_OLE_MAGIC):
@@ -57,6 +80,10 @@ def read_workbook(path: Path | str) -> Workbook:
 
 def read_workbook_bytes(data: bytes, file_name: str) -> Workbook:
     fmt = sniff_format(data, file_name)
+    if fmt == "pdf":
+        raise UnsupportedFileError(f"{file_name} is a PDF drawing, not a workbook")
+    if fmt == "iges":
+        raise UnsupportedFileError(f"{file_name} is an IGES model, not a workbook")
     if fmt == "xlsx":
         return _read_xlsx(data, file_name)
     if fmt == "xls":

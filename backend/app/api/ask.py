@@ -4,6 +4,7 @@ Returns JSON by default, or Server-Sent Events when the client sends Accept: tex
 
 SSE events:
 - ``stage``  {"stage": "asking_llm", "detail": "anthropic"}  progress while the pipeline runs
+  (``reading_scan`` appears when the user has just agreed to read a scanned drawing)
 - ``answer`` the full ``AskResult`` (verified evidence, computation, provider)
 - ``error``  problem details if the pipeline itself crashed
 """
@@ -33,7 +34,10 @@ class AskIn(BaseModel):
 
 def _service(request: Request) -> AskService:
     return AskService(
-        request.app.state.session_factory, request.app.state.gateway, request.app.state.settings
+        request.app.state.session_factory,
+        request.app.state.gateway,
+        request.app.state.settings,
+        request.app.state.vision,
     )
 
 

@@ -53,4 +53,4 @@ def test_question_and_history_are_json_encoded(sample_a):
 def test_offline_rules_engine_round_trip(sample_a):
     draft = rules_answer(build_prompt(_record(sample_a), "What material is it?").user)
     assert draft.status == "answered"
-    assert [e.cell_id for e in draft.evidence] == ["mfg_record_A!Parts!C2"]
+    assert [e.fact_id for e in draft.evidence] == ["mfg_record_A!Parts!C2"]

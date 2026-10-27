@@ -1,4 +1,4 @@
-"""Command line: ``uv run cnc ingest data/``, ``uv run cnc serve``."""
+"""Command line: ``uv run cnc ingest data/``, ``uv run cnc serve``, ``uv run cnc eval``."""
 
 from __future__ import annotations
 
@@ -22,17 +22,119 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
         return 2
     engine = make_engine(settings.database_url)
     try:
-        outcomes = ingest_paths(make_session_factory(engine), path)
+        from app.config import geometry_worker
+        from app.services.file_store import FileStore
+
+        outcomes = ingest_paths(
+            make_session_factory(engine),
+            path,
+            FileStore(settings.store_dir),
+            settings.pdf_max_pages,
+            geometry_worker(settings),
+        )
     finally:
         engine.dispose()
     if not outcomes:
-        print(f"No .xlsx/.xls/.csv files found under {path}")
+        print(f"No .xlsx/.xls/.csv/.pdf/.igs files found under {path}")
         return 1
     for o in outcomes:
         print(f"{o.status:<10} {o.file_name:<32} parts={','.join(o.parts) or '-'}")
         for w in o.warnings:
             print(f"           ! {w}")
     return 1 if any(o.status == "failed" for o in outcomes) else 0
+
+
+def _cmd_rebuild(_: argparse.Namespace) -> int:
+    from app.db.session import make_engine, make_session_factory, session_scope
+    from app.repositories.parts import rebuild_all
+
+    settings = get_settings()
+    engine = make_engine(settings.database_url)
+    try:
+        with session_scope(make_session_factory(engine)) as session:
+            count = rebuild_all(session)
+    finally:
+        engine.dispose()
+    print(f"Rebuilt {count} part records from stored fragments")
+    return 0
+
+
+def _cmd_reset_drawing(args: argparse.Namespace) -> int:
+    """Re-extract a drawing from its file, dropping any vision reading (re-asks for consent)."""
+    from app.db.session import make_engine, make_session_factory, session_scope
+    from app.ingestion.pdf import ingest_drawing_path
+    from app.repositories.parts import replace_drawing
+
+    settings = get_settings()
+    path = Path(args.path)
+    if not path.is_file():
+        print(f"error: {path} is not a file", file=sys.stderr)
+        return 2
+    result = ingest_drawing_path(path, settings.pdf_max_pages)
+    engine = make_engine(settings.database_url)
+    try:
+        with session_scope(make_session_factory(engine)) as session:
+            part = replace_drawing(session, result.file_name, result.slice)
+    finally:
+        engine.dispose()
+    if part is None:
+        print(f"error: {result.file_name} is not an ingested drawing; run `cnc ingest` first")
+        return 1
+    print(f"reset      {result.file_name:<32} part={part} extraction={result.slice.extraction}")
+    return 0
+
+
+def _cmd_reprocess(args: argparse.Namespace) -> int:
+    """Re-measure stored IGES models with the current extractor and rebuild their artifacts."""
+    from sqlalchemy import select
+
+    from app.config import geometry_worker
+    from app.db.models import IngestRun
+    from app.db.session import make_engine, make_session_factory, session_scope
+    from app.geometry.errors import ModelLimitError, UnreadableModelError
+    from app.ingestion.model import ingest_model_bytes
+    from app.repositories.parts import replace_model
+    from app.services.file_store import FileStore
+
+    settings = get_settings()
+    store = FileStore(settings.store_dir)
+    worker = geometry_worker(settings)
+    engine = make_engine(settings.database_url)
+    failed = 0
+    try:
+        factory = make_session_factory(engine)
+        with session_scope(factory) as session:
+            runs = list(
+                session.scalars(
+                    select(IngestRun).where(
+                        IngestRun.file_format == "iges", IngestRun.status == "active"
+                    )
+                )
+            )
+            wanted = [r for r in runs if not args.files or r.file_name in args.files]
+            jobs = [(r.file_name, r.file_sha256) for r in wanted]
+        for name, sha in jobs:
+            data = store.model_bytes(sha)
+            if data is None:
+                print(f"missing    {name:<32} (bytes not in the store; re-ingest it)")
+                failed += 1
+                continue
+            try:
+                result = ingest_model_bytes(data, name, worker)
+            except (UnreadableModelError, ModelLimitError) as exc:
+                print(f"failed     {name:<32} {exc}")
+                failed += 1
+                continue
+            store.put_model(sha, data, result.meshes, result.views, replace_artifacts=True)
+            with session_scope(factory) as session:
+                part = replace_model(session, name, result.slice)
+            print(
+                f"reprocessed {name:<31} part={part or '-'} features={len(result.slice.features)}"
+            )
+    finally:
+        engine.dispose()
+        worker.shutdown()
+    return 1 if failed else 0
 
 
 def _cmd_serve(args: argparse.Namespace) -> int:
@@ -62,9 +164,30 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="cnc", description="SPEC'26 CNC part analyzer")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    p_ingest = sub.add_parser("ingest", help="Ingest a spreadsheet or a directory of them")
+    p_ingest = sub.add_parser(
+        "ingest", help="Ingest a spreadsheet or PDF drawing, or a directory of them"
+    )
     p_ingest.add_argument("path", nargs="?", help="File or directory (default: DATA_DIR)")
     p_ingest.set_defaults(func=_cmd_ingest)
+
+    p_rebuild = sub.add_parser(
+        "rebuild", help="Regroup stored fragments into part records (after an upgrade)"
+    )
+    p_rebuild.set_defaults(func=_cmd_rebuild)
+
+    p_reset = sub.add_parser(
+        "reset-drawing",
+        help="Re-read a drawing from its PDF, discarding any vision reading of a scan",
+    )
+    p_reset.add_argument("path", help="The PDF file that was ingested")
+    p_reset.set_defaults(func=_cmd_reset_drawing)
+
+    p_reprocess = sub.add_parser(
+        "reprocess",
+        help="Re-measure stored IGES models with the current extractor (rebuilds 3D artifacts)",
+    )
+    p_reprocess.add_argument("files", nargs="*", help="Model file names (default: all)")
+    p_reprocess.set_defaults(func=_cmd_reprocess)
 
     p_serve = sub.add_parser("serve", help="Run the API server")
     p_serve.add_argument("--host", default="127.0.0.1")
