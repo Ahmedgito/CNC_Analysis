@@ -15,6 +15,28 @@ const TONE: Record<Tone, { dot: string; text: string }> = {
   checking: { dot: "bg-zinc-400", text: "text-zinc-500" },
 };
 
+/** Readiness flag names from `/readyz` and how to show them. Unknown flags are humanised. */
+const ENGINE_LABELS: Record<string, string> = {
+  anthropic_key: "Claude API",
+  claude_code_token: "Claude Code",
+  groq_key: "Groq",
+};
+
+export function describeEngines(providers: Record<string, unknown>): string {
+  const names = Object.entries(providers)
+    .filter(([, configured]) => configured === true)
+    .map(
+      ([flag]) =>
+        ENGINE_LABELS[flag] ??
+        flag
+          .replace(/_(key|token)$/, "")
+          .split("_")
+          .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+          .join(" "),
+    );
+  return names.length ? names.join(" + ") : "offline rules engine";
+}
+
 /** Live backend health: API reachable, database up, which answer engine is configured. */
 export function ApiStatus({ className }: { className?: string }) {
   const { data, isError, isPending } = useQuery({
@@ -24,11 +46,7 @@ export function ApiStatus({ className }: { className?: string }) {
     retry: 0,
   });
 
-  const providers = data?.providers ?? {};
-  const keys = [providers.anthropic_key ? "Claude" : null, providers.groq_key ? "Groq" : null].filter(
-    Boolean,
-  ) as string[];
-  const engine = keys.length ? keys.join(" + ") : "offline rules engine";
+  const engine = describeEngines(data?.providers ?? {});
 
   const tone: Tone = isPending ? "checking" : isError ? "down" : data?.database ? "ok" : "warn";
   const label =
