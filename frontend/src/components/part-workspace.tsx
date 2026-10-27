@@ -87,9 +87,11 @@ export function PartWorkspace({ partNumber }: { partNumber: string }) {
     .flatMap((s) => s.rows.flatMap((r) => r.cells))
     .find((c) => c.canonical === "description")?.value;
 
-  function selectCell(cellId: string) {
+  function selectCell(cellId: string, opts?: { auto?: boolean }) {
     setSelectedCellId(cellId);
-    setView("record"); // on small screens, show where the evidence lives
+    // On small screens a clicked source opens the record; the automatic first-source highlight
+    // must not hide the answer that just arrived.
+    if (!opts?.auto) setView("record");
   }
 
   return (

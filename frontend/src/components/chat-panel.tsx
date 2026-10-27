@@ -45,7 +45,8 @@ export function ChatPanel({
 }: {
   partNumber: string;
   selectedCellId?: string | null;
-  onSelectCell?: (cellId: string) => void;
+  /** `auto` is true when the app highlights the first source itself, not on a user click. */
+  onSelectCell?: (cellId: string, opts?: { auto?: boolean }) => void;
   className?: string;
 }) {
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -86,7 +87,7 @@ export function ChatPanel({
       if (result.conversation_id) setConversationId(result.conversation_id);
       update(id, () => ({ result }));
       const first = result.evidence[0];
-      if (first) onSelectCell?.(first.cell_id);
+      if (first) onSelectCell?.(first.cell_id, { auto: true });
     } catch (err) {
       const message =
         err instanceof DOMException && err.name === "AbortError"
