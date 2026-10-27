@@ -10,6 +10,7 @@ Fact id grammar, always ``<file stem>!...`` so an id names its file:
 
 - Excel: ``<stem>!<sheet>!<col><row>``             e.g. ``mfg_record_A!Parts!C2``
 - PDF:   ``<stem>!p<page>!<region>!<key>``          e.g. ``2283_bushing!p1!tb!material``
+- IGES:  ``<stem>!m!<feature>``                      e.g. ``2280_flange!m!hole_pattern_1``
 """
 
 from __future__ import annotations
@@ -18,11 +19,12 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-FactSource = Literal["excel", "pdf"]
+FactSource = Literal["excel", "pdf", "iges"]
 # exact: the text is in the file verbatim. inferred: derived by a rule from text in the file
 # (a "SEE NOTE 3" pointer, an unlabelled dimension). vision: read from a scanned image by a
-# vision model, never verifiable against the file's text.
-Confidence = Literal["exact", "inferred", "vision"]
+# vision model, never verifiable against the file's text. measured: computed by the app from a 3D
+# model's geometry (a diameter, a hole count, a volume); exact to the model, not text in a file.
+Confidence = Literal["exact", "inferred", "vision", "measured"]
 
 
 class Fact(BaseModel):
@@ -50,6 +52,12 @@ class Fact(BaseModel):
     region: str | None = None
     kind: str | None = None
     bbox: list[float] | None = None
+
+    # IGES provenance
+    feature: str | None = None
+    method: str | None = None  # how the value was measured
+    anchor: list[float] | None = None  # 3D point in mm the viewer frames
+    numbers: dict[str, float] | None = None  # numbers measured inside the value
 
     @property
     def coordinate(self) -> str | None:
