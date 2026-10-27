@@ -1,15 +1,16 @@
 "use client";
 
 import {
+  ArrowLeftRight,
   Calculator,
   Cog,
   Layers,
   MessageSquareText,
-  Ruler,
   ShieldQuestion,
   Sparkles,
   Wrench,
 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { ApiError, askStream } from "@/lib/api/client";
@@ -30,7 +31,7 @@ type Turn = {
 
 const SUGGESTIONS = [
   { Icon: Layers, q: "What material is it made of?" },
-  { Icon: Ruler, q: "What is the raw stock size?" },
+  { Icon: ArrowLeftRight, q: "Does the drawing agree with the spreadsheet?" },
   { Icon: Cog, q: "List the operations in order" },
   { Icon: Calculator, q: "What is the total setup time?" },
   { Icon: Wrench, q: "Which tools are used?" },
@@ -39,14 +40,14 @@ const SUGGESTIONS = [
 
 export function ChatPanel({
   partNumber,
-  selectedCellId,
-  onSelectCell,
+  selectedFactId,
+  onSelectFact,
   className,
 }: {
   partNumber: string;
-  selectedCellId?: string | null;
+  selectedFactId?: string | null;
   /** `auto` is true when the app highlights the first source itself, not on a user click. */
-  onSelectCell?: (cellId: string, opts?: { auto?: boolean }) => void;
+  onSelectFact?: (factId: string, opts?: { auto?: boolean }) => void;
   className?: string;
 }) {
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -56,6 +57,7 @@ export function ChatPanel({
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const nextId = useRef(1);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     // Scroll only the thread, never the window.
@@ -78,16 +80,22 @@ export function ChatPanel({
     setBusy(true);
     const controller = new AbortController();
     abortRef.current = controller;
+    let readScan = false;
     try {
       const result = await askStream(partNumber, q, {
         conversationId,
         signal: controller.signal,
-        onStage: (stage) => update(id, (t) => ({ stages: [...t.stages, stage] })),
+        onStage: (stage) => {
+          if (stage.stage === "reading_scan") readScan = true;
+          update(id, (t) => ({ stages: [...t.stages, stage] }));
+        },
       });
       if (result.conversation_id) setConversationId(result.conversation_id);
       update(id, () => ({ result }));
+      // A scan read with the user's OK adds drawing facts and cross-checks to the record.
+      if (readScan) void queryClient.invalidateQueries({ queryKey: ["part"] });
       const first = result.evidence[0];
-      if (first) onSelectCell?.(first.cell_id, { auto: true });
+      if (first) onSelectFact?.(first.fact_id, { auto: true });
     } catch (err) {
       const message =
         err instanceof DOMException && err.name === "AbortError"
@@ -159,7 +167,8 @@ export function ChatPanel({
                   Ask anything about part <span className="font-mono">{partNumber}</span>
                 </p>
                 <p className="mt-1 max-w-sm text-sm text-zinc-500">
-                  Answers come only from its files, and each one links to the cells it used.
+                  Answers come only from its spreadsheets and drawings, and each one links to the cell or
+                  drawing callout it used.
                 </p>
               </div>
             </motion.div>
@@ -216,8 +225,9 @@ export function ChatPanel({
                           <motion.div key="answer" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                             <AnswerCard
                               result={t.result}
-                              selectedCellId={selectedCellId}
-                              onSelectCell={onSelectCell}
+                              selectedFactId={selectedFactId}
+                              onSelectFact={onSelectFact}
+                              onAction={busy ? undefined : (action) => void ask(action.reply)}
                             />
                           </motion.div>
                         ) : t.error ? (
@@ -256,11 +266,11 @@ export function ChatPanel({
           placeholders={[
             `Ask about part ${partNumber}…`,
             "What material is it made of?",
-            "Total setup time across operations?",
+            "Does the drawing agree with the spreadsheet?",
             "Which machine runs it?",
             "Stock diameter in inches?",
           ]}
-          focusedPlaceholder="Ask about material, sizes, operations, tools, times…"
+          focusedPlaceholder="Ask about material, sizes, drawing notes, operations, tools, times…"
           suggestions={remaining.slice(0, 4)}
         />
       </div>

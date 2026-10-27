@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import type { AskResult } from "@/lib/api/schemas";
+import type { AskResult, Evidence } from "@/lib/api/schemas";
 import { AnswerCard } from "./answer-card";
 
 vi.mock("next/link", () => ({
@@ -24,12 +24,16 @@ const base: AskResult = {
   suggestions: [],
   confidence: "high",
   sources: {},
+  cross_checks: [],
+  actions: [],
   warnings: [],
 };
 
-const evidence = {
-  cell_id: "mfg_record_A!Parts!C2",
+const evidence: Evidence = {
+  fact_id: "mfg_record_A!Parts!C2",
+  source: "excel",
   file: "mfg_record_A.xlsx",
+  locator: "Parts › C2",
   sheet: "Parts",
   cell: "C2",
   row: 2,
@@ -38,7 +42,27 @@ const evidence = {
   value: "SS304",
   quoted: "SS304",
   hidden: false,
+  stale: false,
+  confidence: "exact",
   auto_linked: false,
+};
+
+const drawingEvidence: Evidence = {
+  fact_id: "2283_bushing!p1!dim!2",
+  source: "pdf",
+  file: "2283_bushing.pdf",
+  locator: "p1 › Dimension › Diameter",
+  header: "Diameter",
+  canonical: null,
+  value: "Ø48",
+  quoted: "Ø48",
+  hidden: false,
+  stale: false,
+  confidence: "exact",
+  auto_linked: false,
+  page: 1,
+  region: "dimension",
+  bbox: [218.2, 321.1, 235.3, 330.1],
 };
 
 describe("AnswerCard", () => {
@@ -51,9 +75,102 @@ describe("AnswerCard", () => {
 
   it("selects the cited cell when a chip is clicked", async () => {
     const onSelect = vi.fn();
-    render(<AnswerCard result={{ ...base, evidence: [evidence] }} onSelectCell={onSelect} />);
+    render(<AnswerCard result={{ ...base, evidence: [evidence] }} onSelectFact={onSelect} />);
     await userEvent.click(screen.getByRole("button", { name: /C2/ }));
     expect(onSelect).toHaveBeenCalledWith("mfg_record_A!Parts!C2");
+  });
+
+  it("names the drawing file, page and callout for a PDF source", async () => {
+    const onSelect = vi.fn();
+    render(
+      <AnswerCard result={{ ...base, evidence: [evidence, drawingEvidence] }} onSelectFact={onSelect} />,
+    );
+    const chip = screen.getByRole("button", { name: /2283_bushing\.pdf › p1 › Dimension › Diameter/ });
+    expect(chip).toHaveTextContent("Ø48");
+    await userEvent.click(chip);
+    expect(onSelect).toHaveBeenCalledWith("2283_bushing!p1!dim!2");
+  });
+
+  it("labels values read from a scan by the vision model", () => {
+    render(<AnswerCard result={{ ...base, evidence: [{ ...drawingEvidence, confidence: "vision" }] }} />);
+    expect(screen.getByLabelText("read by vision model")).toBeInTheDocument();
+  });
+
+  it("asks before reading a scanned drawing and sends the approval reply", async () => {
+    const onAction = vi.fn();
+    const action = {
+      id: "read_scan" as const,
+      file: "3001_gear_blank_scan.pdf",
+      label: "Read 3001_gear_blank_scan.pdf with the vision model",
+      reply: "Yes, read the scanned drawing.",
+    };
+    render(
+      <AnswerCard
+        result={{
+          ...base,
+          status: "needs_consent",
+          answer: "The drawing is a scanned image that the app has not read.",
+          confidence: "low",
+          actions: [action],
+        }}
+        onAction={onAction}
+      />,
+    );
+    expect(screen.getByText("Needs your go-ahead")).toBeInTheDocument();
+    const button = screen.getByRole("button", { name: action.label });
+    await userEvent.click(button);
+    expect(onAction).toHaveBeenCalledWith(action);
+    expect(screen.getByRole("button", { name: "Reading the scan…" })).toBeDisabled();
+  });
+
+  it("does not offer the action while another question is running", () => {
+    render(
+      <AnswerCard
+        result={{
+          ...base,
+          actions: [{ id: "read_scan", file: "a.pdf", label: "Read a.pdf", reply: "Yes" }],
+        }}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Read a.pdf" })).toBeDisabled();
+  });
+
+  it("shows spreadsheet and drawing values side by side, disagreements first", () => {
+    render(
+      <AnswerCard
+        result={{
+          ...base,
+          cross_checks: [
+            {
+              field: "bore",
+              label: "Bore",
+              verdict: "agree",
+              excel: ["job_cards_B!Job Cards!E5"],
+              pdf: ["2283_bushing!p1!dim!3"],
+              excel_value: "Ø30",
+              pdf_value: "Ø30",
+              detail: "Both say Ø30.",
+            },
+            {
+              field: "outer_diameter",
+              label: "Outer diameter",
+              verdict: "disagree",
+              excel: ["job_cards_B!Job Cards!E5"],
+              pdf: ["2283_bushing!p1!dim!2"],
+              excel_value: "Ø50",
+              pdf_value: "Ø48",
+              detail: "Different diameters.",
+            },
+          ],
+        }}
+      />,
+    );
+    const items = screen.getAllByRole("listitem");
+    expect(items[0]).toHaveTextContent("Outer diameter");
+    expect(items[0]).toHaveTextContent("Disagree");
+    expect(items[0]).toHaveTextContent("Ø50");
+    expect(items[0]).toHaveTextContent("Ø48");
+    expect(items[1]).toHaveTextContent("Agree");
   });
 
   it("renders not-found answers with what the record does contain", () => {

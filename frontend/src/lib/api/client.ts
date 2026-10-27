@@ -51,6 +51,11 @@ export async function getPart(partNumber: string) {
   return PartDetail.parse(await resp.json());
 }
 
+/** A drawing page rendered upright as PNG; the server caches it, so the URL is stable. */
+export function drawingPageUrl(partNumber: string, file: string, page: number, dpi = 110) {
+  return `${API_BASE}/parts/${encodeURIComponent(partNumber)}/drawings/${encodeURIComponent(file)}/pages/${page}.png?dpi=${dpi}`;
+}
+
 export type AskOptions = {
   conversationId?: string | null;
   signal?: AbortSignal;

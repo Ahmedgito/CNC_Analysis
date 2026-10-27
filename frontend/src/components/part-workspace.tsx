@@ -20,7 +20,7 @@ const backdrop =
   "pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(rgb(113_113_122/0.18)_1px,transparent_1px)] bg-size-[22px_22px] [mask-image:linear-gradient(to_bottom,black,transparent_70%)] dark:bg-[radial-gradient(rgb(255_255_255/0.06)_1px,transparent_1px)]";
 
 export function PartWorkspace({ partNumber }: { partNumber: string }) {
-  const [selectedCellId, setSelectedCellId] = useState<string | null>(null);
+  const [selectedFactId, setSelectedFactId] = useState<string | null>(null);
   const [view, setView] = useState<View>("ask");
   const { data, error, isPending } = useQuery({
     queryKey: ["part", partNumber],
@@ -83,12 +83,14 @@ export function PartWorkspace({ partNumber }: { partNumber: string }) {
   }
 
   const { record, related } = data;
+  // Other spellings of this part in the files (P-3001, 003001), not the one in the heading.
+  const aliases = record.aliases.filter((a) => a !== record.display_part_number);
   const description = record.sheets
     .flatMap((s) => s.rows.flatMap((r) => r.cells))
     .find((c) => c.canonical === "description")?.value;
 
-  function selectCell(cellId: string, opts?: { auto?: boolean }) {
-    setSelectedCellId(cellId);
+  function selectFact(factId: string, opts?: { auto?: boolean }) {
+    setSelectedFactId(factId);
     // On small screens a clicked source opens the record; the automatic first-source highlight
     // must not hide the answer that just arrived.
     if (!opts?.auto) setView("record");
@@ -115,6 +117,16 @@ export function PartWorkspace({ partNumber }: { partNumber: string }) {
             <span className="font-mono">{record.display_part_number}</span>
             {description ? <span className="text-zinc-500">{description}</span> : null}
           </h1>
+          {aliases.length ? (
+            <p className="text-xs text-zinc-500">
+              Also written as{" "}
+              {aliases.map((a) => (
+                <span key={a} className="mr-2 font-mono">
+                  {a}
+                </span>
+              ))}
+            </p>
+          ) : null}
           {related.length ? (
             <p className="text-xs text-zinc-500">
               Related part numbers:{" "}
@@ -149,13 +161,14 @@ export function PartWorkspace({ partNumber }: { partNumber: string }) {
       >
         <RecordViewer
           record={record}
-          selectedCellId={selectedCellId}
+          selectedFactId={selectedFactId}
+          onSelectFact={selectFact}
           className={cn("h-[72dvh] lg:h-auto", view === "record" ? "flex" : "hidden lg:flex")}
         />
         <ChatPanel
           partNumber={record.part_key}
-          selectedCellId={selectedCellId}
-          onSelectCell={selectCell}
+          selectedFactId={selectedFactId}
+          onSelectFact={selectFact}
           className={cn("h-[76dvh] lg:h-auto", view === "ask" ? "flex" : "hidden lg:flex")}
         />
       </motion.div>

@@ -2,15 +2,21 @@
 
 import {
   AlertTriangle,
+  ArrowLeftRight,
   BookOpen,
   Calculator,
   CheckCircle2,
   ChevronDown,
   CircleHelp,
   Cpu,
+  Eye,
   FileSearch,
+  FileSpreadsheet,
+  FileText,
+  History,
   Link2,
   LocateFixed,
+  ScanEye,
   ShieldAlert,
   ShieldCheck,
   XCircle,
@@ -19,8 +25,9 @@ import { motion } from "motion/react";
 import Link from "next/link";
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
-import type { AnswerStatus, AskResult, Evidence } from "@/lib/api/schemas";
+import type { AnswerStatus, AskAction, AskResult, Evidence } from "@/lib/api/schemas";
 import { cn } from "@/lib/cn";
+import { CrossCheckList } from "./cross-checks";
 import { HoverCard } from "./ui/hover-card";
 
 const STATUS: Record<AnswerStatus, { label: string; className: string; Icon: typeof CheckCircle2 }> = {
@@ -47,6 +54,12 @@ const STATUS: Record<AnswerStatus, { label: string; className: string; Icon: typ
     className:
       "bg-violet-50 text-violet-800 ring-violet-200 dark:bg-violet-400/10 dark:text-violet-300 dark:ring-violet-400/25",
     Icon: CircleHelp,
+  },
+  needs_consent: {
+    label: "Needs your go-ahead",
+    className:
+      "bg-orange-50 text-orange-900 ring-orange-200 dark:bg-orange-400/10 dark:text-orange-200 dark:ring-orange-400/25",
+    Icon: ScanEye,
   },
   blocked: {
     label: "Request blocked",
@@ -99,15 +112,22 @@ export function StatusPill({ status }: { status: AnswerStatus }) {
   );
 }
 
+/** "file › sheet › C2" for a cell, "file › p1 › Dimension › Diameter" for a drawing callout. */
+export function evidenceLabel(e: Evidence) {
+  if (e.locator) return `${e.file} › ${e.locator}`;
+  return e.source === "pdf" ? `${e.file} › p${e.page ?? 1}` : `${e.file} › ${e.sheet} › ${e.cell}`;
+}
+
 function EvidencePreview({ evidence }: { evidence: Evidence }) {
+  const pdf = evidence.source === "pdf";
   return (
     <span className="flex flex-col gap-2">
       <span className="flex items-center justify-between gap-2 font-mono text-[11px] text-zinc-500">
         <span className="truncate">
-          {evidence.file} › {evidence.sheet}
+          {evidence.file} › {pdf ? `page ${evidence.page ?? 1}` : evidence.sheet}
         </span>
         <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-zinc-700 dark:bg-white/10 dark:text-zinc-200">
-          {evidence.cell}
+          {pdf ? (evidence.region ?? "drawing").replace("_", " ") : evidence.cell}
         </span>
       </span>
       <span className="text-[11px] tracking-wide text-zinc-500 uppercase">{evidence.header}</span>
@@ -116,8 +136,18 @@ function EvidencePreview({ evidence }: { evidence: Evidence }) {
       </span>
       <span className="flex items-center gap-1 text-[11px] text-cyan-700 dark:text-cyan-300">
         <LocateFixed className="size-3" aria-hidden />
-        Click to locate this cell in the record
+        {pdf ? "Click to locate this callout on the drawing" : "Click to locate this cell in the record"}
       </span>
+      {evidence.confidence === "vision" ? (
+        <span className="text-[11px] text-violet-700 dark:text-violet-300">
+          Read from a scanned image by the vision model. Check it against the drawing before relying on it.
+        </span>
+      ) : null}
+      {evidence.stale ? (
+        <span className="text-[11px] text-zinc-500">
+          History: an archived or superseded value, not the current one.
+        </span>
+      ) : null}
       {evidence.auto_linked ? (
         <span className="text-[11px] text-zinc-500">
           Linked automatically: the answer states this value but the model did not cite it.
@@ -137,13 +167,16 @@ export function EvidenceChip({
 }: {
   evidence: Evidence;
   active?: boolean;
-  onSelect?: (cellId: string) => void;
+  onSelect?: (factId: string) => void;
 }) {
+  const pdf = evidence.source === "pdf";
+  const vision = evidence.confidence === "vision";
+  const SourceIcon = pdf ? FileText : FileSpreadsheet;
   return (
     <HoverCard content={<EvidencePreview evidence={evidence} />}>
       <motion.button
         type="button"
-        onClick={() => onSelect?.(evidence.cell_id)}
+        onClick={() => onSelect?.(evidence.fact_id)}
         whileHover={{ y: -1 }}
         whileTap={{ scale: 0.97 }}
         className={cn(
@@ -151,14 +184,24 @@ export function EvidenceChip({
           active
             ? "border-amber-400 bg-amber-100 text-amber-900 shadow-sm shadow-amber-500/20 dark:bg-amber-400/15 dark:text-amber-200"
             : "border-zinc-200 bg-zinc-50 text-zinc-700 hover:border-cyan-400/60 hover:bg-white dark:border-white/10 dark:bg-white/5 dark:text-zinc-300",
-          evidence.auto_linked && "border-dashed",
+          (evidence.auto_linked || vision) && "border-dashed",
+          vision && !active && "border-violet-400/70",
+          evidence.stale && "opacity-70",
         )}
       >
+        <SourceIcon
+          className={cn("size-3 shrink-0", pdf ? "text-rose-500" : "text-emerald-600")}
+          aria-hidden
+        />
         {evidence.auto_linked ? <Link2 className="size-3 shrink-0" aria-hidden /> : null}
-        <span className="truncate">
-          {evidence.file} › {evidence.sheet} › {evidence.cell}
+        {vision ? (
+          <Eye className="size-3 shrink-0 text-violet-500" aria-label="read by vision model" />
+        ) : null}
+        {evidence.stale ? <History className="size-3 shrink-0" aria-label="history" /> : null}
+        <span className="truncate">{evidenceLabel(evidence)}</span>
+        <span className="truncate font-sans text-zinc-500 dark:text-zinc-400">
+          · {pdf ? evidence.value : evidence.header}
         </span>
-        <span className="truncate font-sans text-zinc-500 dark:text-zinc-400">· {evidence.header}</span>
       </motion.button>
     </HoverCard>
   );
@@ -187,16 +230,20 @@ const reveal = {
 
 export function AnswerCard({
   result,
-  selectedCellId,
-  onSelectCell,
+  selectedFactId,
+  onSelectFact,
+  onAction,
 }: {
   result: AskResult;
-  selectedCellId?: string | null;
-  onSelectCell?: (cellId: string) => void;
+  selectedFactId?: string | null;
+  onSelectFact?: (factId: string) => void;
+  /** Approve an offered action (e.g. reading a scan); undefined while another question runs. */
+  onAction?: (action: AskAction) => void;
 }) {
   const v = result.verification;
   const p = result.provider;
   const [showFields, setShowFields] = useState(false);
+  const [approved, setApproved] = useState<string | null>(null);
   const verified = v && v.citations_checked + v.auto_linked > 0;
 
   return (
@@ -253,14 +300,56 @@ export function AnswerCard({
           >
             {result.evidence.map((e) => (
               <motion.span
-                key={e.cell_id}
+                key={e.fact_id}
                 variants={{ hidden: { opacity: 0, scale: 0.9 }, show: { opacity: 1, scale: 1 } }}
                 className="max-w-full"
               >
-                <EvidenceChip evidence={e} active={selectedCellId === e.cell_id} onSelect={onSelectCell} />
+                <EvidenceChip evidence={e} active={selectedFactId === e.fact_id} onSelect={onSelectFact} />
               </motion.span>
             ))}
           </motion.div>
+        </motion.div>
+      ) : null}
+
+      {result.actions.length ? (
+        <motion.div variants={reveal} className="flex flex-col gap-2">
+          {result.actions.map((a) => (
+            <motion.button
+              key={`${a.id}-${a.file}`}
+              type="button"
+              disabled={!onAction || approved !== null}
+              onClick={() => {
+                setApproved(a.file);
+                onAction?.(a);
+              }}
+              whileHover={{ y: -1 }}
+              whileTap={{ scale: 0.98 }}
+              className="group relative inline-flex w-fit items-center gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 px-3.5 py-2 text-sm font-medium text-white shadow-md shadow-orange-500/25 transition-opacity focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <span
+                aria-hidden
+                className="absolute inset-y-0 -left-1/2 w-1/2 -skew-x-12 bg-white/25 transition-transform duration-700 group-hover:translate-x-[300%]"
+              />
+              <ScanEye className="relative size-4" aria-hidden />
+              <span className="relative">{approved === a.file ? "Reading the scan…" : a.label}</span>
+            </motion.button>
+          ))}
+          <p className="text-xs text-zinc-500">
+            The page images are sent to the vision model. Values read this way are labelled{" "}
+            <span className="inline-flex items-center gap-0.5 text-violet-700 dark:text-violet-300">
+              <Eye className="size-3" aria-hidden /> vision
+            </span>{" "}
+            so you can check them against the drawing.
+          </p>
+        </motion.div>
+      ) : null}
+
+      {result.cross_checks.length ? (
+        <motion.div variants={reveal} className="flex flex-col gap-1.5">
+          <p className="flex items-center gap-1.5 text-[11px] font-medium tracking-[0.15em] text-zinc-500 uppercase">
+            <ArrowLeftRight className="size-3" aria-hidden /> Spreadsheet vs drawing
+          </p>
+          <CrossCheckList checks={result.cross_checks} selected={selectedFactId} onSelect={onSelectFact} />
         </motion.div>
       ) : null}
 
@@ -341,7 +430,7 @@ export function AnswerCard({
           {v && verified ? (
             <span
               className="inline-flex items-center gap-1.5"
-              title={v.dropped.map((d) => `${d.cell_id}: ${d.reason}`).join("\n")}
+              title={v.dropped.map((d) => `${d.fact_id}: ${d.reason}`).join("\n")}
             >
               <ShieldCheck className="size-3.5 text-emerald-500" aria-hidden />
               <span>

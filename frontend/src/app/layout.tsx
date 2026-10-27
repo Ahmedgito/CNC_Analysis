@@ -11,7 +11,7 @@ const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"]
 export const metadata: Metadata = {
   title: { default: "CNC Part Analyzer", template: "%s · CNC Part Analyzer" },
   description:
-    "Evidence-grounded answers about CNC parts from their manufacturing records. Every answer cites the exact spreadsheet cells it used.",
+    "Evidence-grounded answers about CNC parts from their manufacturing records and drawings. Every answer cites the exact spreadsheet cell or drawing callout it used.",
 };
 
 export const viewport: Viewport = {

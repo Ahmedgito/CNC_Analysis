@@ -85,9 +85,9 @@ export function Hero() {
           >
             <span className="flex items-center gap-2 text-xs font-medium">
               <span className="size-1.5 rounded-full bg-emerald-500" aria-hidden />
-              <TextShimmer>Level 1 live: Excel manufacturing records</TextShimmer>
+              <TextShimmer>Level 2 live: Excel records + PDF drawings, cross-checked</TextShimmer>
               <span className="text-zinc-400">·</span>
-              <span className="text-zinc-500">PDF and IGES next</span>
+              <span className="text-zinc-500">IGES next</span>
             </span>
           </BorderBeam>
         </motion.div>
@@ -95,7 +95,7 @@ export function Hero() {
         <h1 className="mt-7 text-4xl font-semibold tracking-tight text-balance sm:text-6xl lg:text-7xl">
           <BlurText text="Every answer," delay={0.15} />{" "}
           <BlurText
-            text="traced to the cell."
+            text="traced to its source."
             delay={0.35}
             wordClassName="bg-gradient-to-br from-cyan-500 via-sky-500 to-teal-400 bg-clip-text pb-1 text-transparent dark:from-cyan-300 dark:via-sky-400 dark:to-teal-300"
           />
@@ -107,8 +107,9 @@ export function Hero() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.6, ease }}
         >
-          Type a part number, ask about material, stock, operations or times, and get a plain answer with a
-          link to the exact spreadsheet cell. If the files don&apos;t say, it tells you so.
+          Type a part number, ask about material, sizes, drawing notes, operations or times, and get a plain
+          answer linked to the exact spreadsheet cell or drawing callout. Where the two files disagree, it
+          shows both. If the files don&apos;t say, it tells you so.
         </motion.p>
 
         <motion.form
