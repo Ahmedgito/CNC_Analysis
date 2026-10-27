@@ -56,6 +56,21 @@ class DrawingIngestSummary(BaseModel):
     title_block_fields: list[str]
 
 
+class ModelIngestSummary(BaseModel):
+    linked_part: str | None
+    part_number_source: str | None
+    topology: str
+    valid: bool
+    bodies: int
+    faces: int
+    form: str
+    units: str | None
+    units_declared: bool
+    revision: str | None
+    features: int
+    views: list[str]
+
+
 class FileIngestOut(BaseModel):
     file_name: str
     run_id: uuid.UUID | None
@@ -64,8 +79,9 @@ class FileIngestOut(BaseModel):
     superseded_runs: int
     warnings: list[str]
     sheets: list[SheetIngestOut]
-    kind: str = Field(default="workbook", description="workbook | drawing")
+    kind: str = Field(default="workbook", description="workbook | drawing | model")
     drawing: DrawingIngestSummary | None = None
+    model: ModelIngestSummary | None = None
 
 
 class IngestOut(BaseModel):

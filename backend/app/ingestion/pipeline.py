@@ -22,6 +22,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from app.domain.drawing import DrawingSlice
+from app.domain.model import ModelSlice
 from app.domain.record import (
     CellRef,
     ColumnInfo,
@@ -513,6 +514,33 @@ def _pdf_note(
     return None
 
 
+def _iges_status(models: list[ModelSlice]) -> SourceStatus:
+    if not models:
+        return SourceStatus(
+            available=False, note="No IGES 3D model for this part was found in the ingested files"
+        )
+    current = models[0]
+    note = None
+    if current.topology == "open_shell":
+        note = f"{current.file}: the surfaces do not close into a solid; volume is not derivable"
+    elif current.topology == "multi_solid":
+        note = (
+            f"{current.file}: {current.bodies} separate solids; part-level sizes are not comparable"
+        )
+    elif current.topology == "wireframe":
+        note = f"{current.file}: curves only, no surfaces; only an approximate envelope is known"
+    elif not current.valid:
+        note = f"{current.file}: the solid fails the kernel's validity check"
+    return SourceStatus(
+        available=True,
+        files=[m.file for m in models],
+        note=note,
+        readable=current.topology != "wireframe",
+        current_revision=current.revision,
+        valid=current.valid,
+    )
+
+
 def _is_nullish(value: str) -> bool:
     return normalize_for_match(value) in _NULLISH
 
@@ -531,8 +559,10 @@ def merge_fragments(
     fragments: list[PartFragment],
     other_sources: dict[str, SourceStatus] | None = None,
     drawings: list[DrawingSlice] | None = None,
+    models: list[ModelSlice] | None = None,
 ) -> PartRecord:
-    """Combine one part's fragments from several workbooks and drawings into a single record."""
+    """Combine one part's fragments from workbooks, drawings and 3D models into one record."""
+    from app.ingestion.model import mark_superseded_models
     from app.services.crosscheck import cross_check, values_agree  # domain service, no I/O
 
     sheets = [s for f in fragments for s in f.sheets]
@@ -540,8 +570,11 @@ def merge_fragments(
     drawings = sorted(drawings or [], key=lambda d: d.file)
     live_fragments = [f for f in fragments if any(not s.stale for s in f.sheets)] or fragments
     display = live_fragments[0].display_part_number if live_fragments else part_key
+    models = mark_superseded_models(sorted(models or [], key=lambda m: m.file))
     if not fragments and drawings:
         display = next((d.part_number for d in drawings if d.part_number), part_key)
+    elif not fragments and models:
+        display = next((m.part_number for m in models if m.part_number), part_key)
     base, suffix = split_part_key(part_key)
 
     present: dict[str, None] = {}
@@ -559,6 +592,10 @@ def merge_fragments(
         for f in d.facts:
             if f.canonical and not f.stale:
                 present.setdefault(f"{_field_label(f.canonical)} (drawing)")
+    for m in models:
+        for mf in m.features:
+            if mf.kind != "header" and not mf.stale:
+                present.setdefault(f"{mf.label} (3D model)")
 
     warnings: list[str] = []
     seen: dict[str, tuple[str, CellRef]] = {}
@@ -605,7 +642,7 @@ def merge_fragments(
             scanned=scanned,
             current_revision=current_rev,
         ),
-        "iges": SourceStatus(available=False, note="IGES models are not ingested yet (Level 3)"),
+        "iges": _iges_status(models),
     }
     if other_sources:
         sources.update(other_sources)
@@ -613,9 +650,17 @@ def merge_fragments(
         warnings.append("Some values come from hidden sheets/rows; treat them with care")
     for d in drawings:
         warnings.extend(f"{d.file}: {w}" for w in d.warnings)
+    for m in models:
+        warnings.extend(f"{m.file}: {w}" for w in m.warnings)
+    if models and models[0].revision and current_rev and models[0].revision != current_rev:
+        warnings.append(
+            f"The model {models[0].file} is Rev {models[0].revision} but the drawing is Rev "
+            f"{current_rev}; checks between them may compare different revisions"
+        )
 
     spellings = {f.display_part_number for f in fragments}
     spellings |= {d.part_number for d in drawings if d.part_number}
+    spellings |= {m.part_number for m in models if m.part_number}
     aliases = sorted(spellings - {display})
     record = PartRecord(
         part_key=part_key,
@@ -627,6 +672,7 @@ def merge_fragments(
         available_fields=list(present) + list(unmapped),
         warnings=warnings,
         drawings=drawings,
+        models=models,
         aliases=aliases,
     )
     record.cross_checks = cross_check(record)

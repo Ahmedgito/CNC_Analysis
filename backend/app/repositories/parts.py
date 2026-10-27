@@ -1,10 +1,10 @@
-"""Persistence for ingest runs, cells, drawing facts, part fragments and merged part records.
+"""Persistence for ingest runs, cells, drawing and model facts, part fragments and part records.
 
 Records are rebuilt per *base number* group: every active fragment whose part number has the same
 base (``P-3001``, ``3001``, ``003003`` -> ``3003``, ``3004-A`` -> ``3004``) is loaded, grouped by
-identity key, and merged. A drawing-only identity (``3004`` from a title block) joins the one
-spreadsheet record with that base number (``3004-A``) when exactly one exists; otherwise it
-stays a record of its own, so a drawing is never attached to a guessed part.
+identity key, and merged. A drawing- or model-only identity (``3004`` from a title block or a
+file name) joins the one spreadsheet record with that base number (``3004-A``) when exactly one
+exists; otherwise it stays a record of its own, so a file is never attached to a guessed part.
 """
 
 from __future__ import annotations
@@ -17,9 +17,18 @@ from rapidfuzz import fuzz, process
 from sqlalchemy import delete, insert, or_, select, update
 from sqlalchemy.orm import Session
 
-from app.db.models import CellRow, DrawingFactRow, IngestRun, PartFragmentRow, PartRow
+from app.db.models import (
+    CellRow,
+    DrawingFactRow,
+    IngestRun,
+    ModelFactRow,
+    PartFragmentRow,
+    PartRow,
+)
 from app.domain.drawing import DrawingSlice
+from app.domain.model import ModelSlice, make_model_fact_id
 from app.domain.record import PartRecord, PartSummary, SheetSlice
+from app.ingestion.model import ModelIngestResult
 from app.ingestion.parts import base_of, identity_key, split_part_key
 from app.ingestion.pdf import DrawingIngestResult
 from app.ingestion.pipeline import IngestResult, PartFragment, merge_fragments
@@ -36,8 +45,9 @@ class IngestOutcome:
     superseded_runs: int = 0
     warnings: list[str] = field(default_factory=list)
     sheets: list[dict] = field(default_factory=list)
-    kind: str = "workbook"  # workbook | drawing
+    kind: str = "workbook"  # workbook | drawing | model
     drawing: dict | None = None  # summary for drawings: pages, scanned, linked part, ...
+    model: dict | None = None  # summary for models: topology, units, features, linked part
 
 
 def _duplicate(
@@ -261,6 +271,123 @@ def drawing_summary(d: DrawingSlice, part_key: str | None) -> dict:
     }
 
 
+def save_model(session: Session, result: ModelIngestResult) -> IngestOutcome:
+    """Persist one measured IGES model and attach it to its part."""
+    m = result.slice
+    parts = [result.part_key] if result.part_key else []
+    dup = _duplicate(session, result.sha256, result.file_name, parts)
+    if dup is not None:
+        dup.kind, dup.model = "model", model_summary(m, result.part_key)
+        return dup
+
+    superseded, bases, old_keys = _supersede(session, result.file_name)
+    run = IngestRun(
+        file_name=result.file_name,
+        file_sha256=result.sha256,
+        file_format="iges",
+        status="active",
+        part_count=len(parts),
+        cell_count=len(m.features),
+        extraction="geometry",
+        sheets=[],
+        warnings=result.warnings,
+    )
+    session.add(run)
+    session.flush()
+    _insert_model_facts(session, run.id, m, result.part_key)
+    key = result.part_key or ""
+    session.add(
+        PartFragmentRow(
+            run_id=run.id,
+            part_key=key,
+            base_key=base_of(key) if key else "",
+            kind="model",
+            display_part_number=m.part_number or key,
+            sheets=[],
+            model=m.model_dump(mode="json"),
+        )
+    )
+    session.flush()
+    if key:
+        bases.add(base_of(key))
+    rebuild_bases(session, bases, stale_keys=old_keys)
+    return IngestOutcome(
+        file_name=result.file_name,
+        run_id=run.id,
+        status="created",
+        parts=parts,
+        superseded_runs=superseded,
+        warnings=result.warnings,
+        kind="model",
+        model=model_summary(m, result.part_key),
+    )
+
+
+def _insert_model_facts(
+    session: Session, run_id: uuid.UUID, m: ModelSlice, part_key: str | None
+) -> None:
+    rows = [
+        {
+            "run_id": run_id,
+            "fact_id": make_model_fact_id(m.file_stem, f.feature_id),
+            "part_key": identity_key(part_key) if part_key else None,
+            "file_name": m.file,
+            "feature": f.feature_id[:64],
+            "kind": f.kind,
+            "label": f.label,
+            "canonical": f.canonical,
+            "value": f.value,
+            "unit": f.unit,
+            "numbers": f.numbers,
+            "confidence": f.confidence,
+            "method": f.method,
+            "stale": f.stale,
+        }
+        for f in m.features
+    ]
+    if rows:
+        session.execute(insert(ModelFactRow), rows)
+
+
+def model_summary(m: ModelSlice, part_key: str | None) -> dict:
+    return {
+        "linked_part": part_key,
+        "part_number_source": m.part_number_source,
+        "topology": m.topology,
+        "valid": m.valid,
+        "bodies": m.bodies,
+        "faces": m.faces,
+        "form": m.form,
+        "units": m.header.units,
+        "units_declared": m.header.units_declared,
+        "revision": m.revision,
+        "features": len([f for f in m.features if f.kind != "header"]),
+        "views": m.views,
+    }
+
+
+def replace_model(session: Session, file_name: str, m: ModelSlice) -> str | None:
+    """Swap the stored slice of an active model (after re-extracting with a newer extractor)."""
+    frag = session.scalar(
+        select(PartFragmentRow)
+        .join(IngestRun)
+        .where(
+            IngestRun.file_name == file_name,
+            IngestRun.status == "active",
+            PartFragmentRow.kind == "model",
+        )
+    )
+    if frag is None:
+        return None
+    frag.model = m.model_dump(mode="json")
+    session.execute(delete(ModelFactRow).where(ModelFactRow.run_id == frag.run_id))
+    _insert_model_facts(session, frag.run_id, m, frag.part_key or None)
+    session.flush()
+    if frag.part_key:
+        rebuild_bases(session, {frag.base_key or base_of(frag.part_key)})
+    return frag.part_key or None
+
+
 def replace_drawing(session: Session, file_name: str, d: DrawingSlice) -> str | None:
     """Swap the stored slice of an active drawing (after a consented vision read)."""
     frag = session.scalar(
@@ -300,6 +427,7 @@ def _dedupe_cells(result: IngestResult) -> list[tuple]:
 class _Group:
     sheets: list[PartFragment] = field(default_factory=list)
     drawings: list[DrawingSlice] = field(default_factory=list)
+    models: list[ModelSlice] = field(default_factory=list)
     raw_keys: set[str] = field(default_factory=set)
 
 
@@ -318,6 +446,8 @@ def rebuild_bases(session: Session, bases: set[str], stale_keys: set[str] | None
             g.raw_keys.add(f.part_key)
             if f.kind == "drawing" and f.drawing:
                 g.drawings.append(DrawingSlice.model_validate(f.drawing))
+            elif f.kind == "model" and f.model:
+                g.models.append(ModelSlice.model_validate(f.model))
             else:
                 g.sheets.append(
                     PartFragment(
@@ -334,10 +464,11 @@ def rebuild_bases(session: Session, bases: set[str], stale_keys: set[str] | None
                 target = anchors[0]  # 3004 (title block) joins 3004-A (the only register row)
             final[target].sheets.extend(g.sheets)
             final[target].drawings.extend(g.drawings)
+            final[target].models.extend(g.models)
             final[target].raw_keys |= g.raw_keys
 
         for key, g in final.items():
-            record = merge_fragments(key, g.sheets, drawings=g.drawings)
+            record = merge_fragments(key, g.sheets, drawings=g.drawings, models=g.models)
             _upsert_part(session, key, base, record)
         obsolete = select(PartRow.part_key).where(
             PartRow.base_key == base, PartRow.part_key.not_in(list(final) or [""])
@@ -425,7 +556,7 @@ def list_parts(session: Session, query: str | None = None, limit: int = 200) -> 
                 display_part_number=row.display_part_number,
                 description=row.description,
                 sources=rec.sources,
-                files=[*rec.sources["excel"].files, *rec.sources["pdf"].files],
+                files=[s for kind in ("excel", "pdf", "iges") for s in rec.sources[kind].files],
             )
         )
     return out
@@ -469,6 +600,19 @@ def unlinked_drawings(session: Session) -> list[DrawingSlice]:
         )
     )
     return [DrawingSlice.model_validate(r.drawing) for r in rows if r.drawing]
+
+
+def unlinked_models(session: Session) -> list[ModelSlice]:
+    rows = session.scalars(
+        select(PartFragmentRow)
+        .join(IngestRun)
+        .where(
+            PartFragmentRow.kind == "model",
+            PartFragmentRow.part_key == "",
+            IngestRun.status == "active",
+        )
+    )
+    return [ModelSlice.model_validate(r.model) for r in rows if r.model]
 
 
 def drawing_bytes_source(session: Session, file_name: str) -> IngestRun | None:

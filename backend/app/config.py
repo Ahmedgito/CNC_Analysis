@@ -30,6 +30,11 @@ class Settings(BaseSettings):
     # Original drawing bytes and rendered page images (content-addressed, safe to delete).
     store_dir: Path = Path(__file__).resolve().parent.parent / "var" / "store"
     pdf_max_pages: int = 20
+    # IGES geometry runs in an isolated worker process with these limits (PLAN_LEVEL3 4.1).
+    geometry_timeout_s: float = 30.0
+    geometry_memory_mb: int = 1536
+    iges_max_mb: int = 25
+    geometry_inline: bool = False  # run the kernel in-process (tests, trusted CLI use only)
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
 
     # LLM
@@ -68,3 +73,15 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
+
+def geometry_worker(settings: Settings):
+    """The shared geometry worker for these settings (imported lazily; no kernel in the API)."""
+    from app.geometry.worker import get_worker
+
+    return get_worker(
+        settings.geometry_timeout_s,
+        settings.geometry_memory_mb,
+        settings.iges_max_mb * 1024 * 1024,
+        settings.geometry_inline,
+    )

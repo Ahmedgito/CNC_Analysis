@@ -560,6 +560,9 @@ def _evidence_out(fact: Fact, quoted: str, auto_linked: bool) -> EvidenceOut:
         page=fact.page,
         region=fact.region,
         bbox=fact.bbox,
+        feature=fact.feature,
+        method=fact.method,
+        anchor=fact.anchor,
     )
 
 

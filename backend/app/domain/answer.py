@@ -31,7 +31,7 @@ class EvidenceOut(BaseModel):
     """One verified source fact behind an answer. Answers stored before Level 2 used ``cell_id``."""
 
     fact_id: str = _FACT_ID
-    source: Literal["excel", "pdf"] = "excel"
+    source: Literal["excel", "pdf", "iges"] = "excel"
     file: str
     locator: str = ""
     header: str = Field(description="Column header or drawing label as printed")
@@ -40,7 +40,7 @@ class EvidenceOut(BaseModel):
     quoted: str
     hidden: bool = False
     stale: bool = False
-    confidence: Literal["exact", "inferred", "vision"] = "exact"
+    confidence: Literal["exact", "inferred", "vision", "measured"] = "exact"
     auto_linked: bool = Field(
         default=False,
         description="Value appears verbatim in the answer but the model did not cite it",
@@ -53,6 +53,10 @@ class EvidenceOut(BaseModel):
     page: int | None = None
     region: str | None = None
     bbox: list[float] | None = None
+    # IGES provenance
+    feature: str | None = None
+    method: str | None = None
+    anchor: list[float] | None = None
 
 
 class DroppedOut(BaseModel):

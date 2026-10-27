@@ -22,6 +22,7 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
         return 2
     engine = make_engine(settings.database_url)
     try:
+        from app.config import geometry_worker
         from app.services.file_store import FileStore
 
         outcomes = ingest_paths(
@@ -29,11 +30,12 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
             path,
             FileStore(settings.store_dir),
             settings.pdf_max_pages,
+            geometry_worker(settings),
         )
     finally:
         engine.dispose()
     if not outcomes:
-        print(f"No .xlsx/.xls/.csv/.pdf files found under {path}")
+        print(f"No .xlsx/.xls/.csv/.pdf/.igs files found under {path}")
         return 1
     for o in outcomes:
         print(f"{o.status:<10} {o.file_name:<32} parts={','.join(o.parts) or '-'}")
