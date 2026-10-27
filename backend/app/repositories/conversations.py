@@ -51,6 +51,21 @@ def recent_history(session: Session, conversation_id: uuid.UUID, turns: int) -> 
     return history[-turns:]
 
 
+def last_exchange(session: Session, conversation_id: uuid.UUID) -> tuple[str, dict] | None:
+    """The latest (user question, assistant answer JSON) pair, used to honour a pending offer."""
+    msgs = list(
+        session.scalars(
+            select(Message)
+            .where(Message.conversation_id == conversation_id)
+            .order_by(Message.created_at.desc())
+            .limit(2)
+        )
+    )
+    if len(msgs) == 2 and msgs[0].role == "assistant" and msgs[1].role == "user":
+        return msgs[1].content, msgs[0].answer or {}
+    return None
+
+
 def save_exchange(
     session: Session, conversation_id: uuid.UUID, question: str, answer_text: str, answer: dict
 ) -> uuid.UUID:
