@@ -16,11 +16,12 @@ from typing import Literal
 
 from app.ingestion.cells import RawCell, Sheet, ValueType, Workbook
 
-FileFormat = Literal["xlsx", "xls", "csv"]
+FileFormat = Literal["xlsx", "xls", "csv", "pdf"]
 
 _ZIP_MAGIC = b"PK\x03\x04"
 _OLE_MAGIC = b"\xd0\xcf\x11\xe0"
-SUPPORTED_SUFFIXES = {".xlsx", ".xlsm", ".xls", ".csv"}
+SUPPORTED_SUFFIXES = {".xlsx", ".xlsm", ".xls", ".csv", ".pdf"}
+_PDF_MAGIC = b"%PDF-"
 _CSV_NUMBER_RE = re.compile(r"^-?\d+(\.\d+)?$")
 _SCALAR_TYPES = (str, int, float, bool, datetime, date, time)
 
@@ -30,6 +31,12 @@ class UnsupportedFileError(ValueError):
 
 
 def sniff_format(data: bytes, file_name: str) -> FileFormat:
+    # The PDF header may follow up to 1 KB of junk; it must be checked before the text heuristic,
+    # which would otherwise take a PDF for a CSV file.
+    if _PDF_MAGIC in data[:1024]:
+        return "pdf"
+    if file_name.lower().endswith(".pdf"):
+        raise UnsupportedFileError(f"{file_name}: named .pdf but the content is not a PDF")
     if data.startswith(_ZIP_MAGIC):
         return "xlsx"
     if data.startswith(_OLE_MAGIC):
@@ -57,6 +64,8 @@ def read_workbook(path: Path | str) -> Workbook:
 
 def read_workbook_bytes(data: bytes, file_name: str) -> Workbook:
     fmt = sniff_format(data, file_name)
+    if fmt == "pdf":
+        raise UnsupportedFileError(f"{file_name} is a PDF drawing, not a workbook")
     if fmt == "xlsx":
         return _read_xlsx(data, file_name)
     if fmt == "xls":

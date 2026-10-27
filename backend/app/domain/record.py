@@ -85,6 +85,7 @@ class SheetSlice(BaseModel):
     stale: bool = False  # an archive / obsolete / history sheet
     stale_reason: str | None = None
     layout: str = "table"  # table | card (a vertical label/value part card)
+    default_unit: str | None = None  # from a banner statement such as "Units: mm unless stated"
 
 
 class SourceStatus(BaseModel):

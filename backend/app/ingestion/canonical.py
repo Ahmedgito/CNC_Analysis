@@ -41,6 +41,8 @@ class CanonicalField(StrEnum):
     COST = "cost"
     DUE_DATE = "due_date"
     WEIGHT = "weight"
+    STATUS = "status"
+    LAST_UPDATED = "last_updated"
 
 
 # Human-readable labels, used in prompts and "fields available" lists.
@@ -69,6 +71,8 @@ FIELD_LABELS: dict[CanonicalField, str] = {
     CanonicalField.COST: "cost / price",
     CanonicalField.DUE_DATE: "due / delivery date",
     CanonicalField.WEIGHT: "weight",
+    CanonicalField.STATUS: "release status",
+    CanonicalField.LAST_UPDATED: "last updated",
 }
 
 # Synonyms gathered from ERP exports, job cards, routers and travelers (see docs/PLAN.md).
@@ -169,6 +173,9 @@ _SYNONYMS: dict[CanonicalField, tuple[str, ...]] = {
         "tapped holes",
         "hole",
         "holes details",
+        "feature notes",
+        "features",
+        "feature",
     ),
     CanonicalField.MACHINE: (
         "machine",
@@ -201,6 +208,11 @@ _SYNONYMS: dict[CanonicalField, tuple[str, ...]] = {
         "standard time",
         "process time",
         "time/piece",
+        "est time",
+        "estimated time",
+        "est hrs",
+        "est hours",
+        "time est",
     ),
     CanonicalField.SETUP_TIME: (
         "setup",
@@ -361,6 +373,21 @@ _SYNONYMS: dict[CanonicalField, tuple[str, ...]] = {
         "promise date",
     ),
     CanonicalField.WEIGHT: ("weight", "wt", "mass", "net wt", "gross wt", "net weight"),
+    CanonicalField.STATUS: (
+        "status",
+        "release status",
+        "lifecycle",
+        "lifecycle status",
+        "part status",
+        "drawing status",
+    ),
+    CanonicalField.LAST_UPDATED: (
+        "last updated",
+        "updated",
+        "last modified",
+        "modified",
+        "date updated",
+    ),
 }
 
 # Unit tokens recognised inside header parentheses: "Cycle Time (min)" -> unit "min".
