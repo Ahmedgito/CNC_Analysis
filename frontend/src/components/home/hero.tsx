@@ -85,9 +85,9 @@ export function Hero() {
           >
             <span className="flex items-center gap-2 text-xs font-medium">
               <span className="size-1.5 rounded-full bg-emerald-500" aria-hidden />
-              <TextShimmer>Level 2 live: Excel records + PDF drawings, cross-checked</TextShimmer>
+              <TextShimmer>Level 3 live: Excel, PDF drawings and IGES 3D models</TextShimmer>
               <span className="text-zinc-400">·</span>
-              <span className="text-zinc-500">IGES next</span>
+              <span className="text-zinc-500">cross-checked three ways</span>
             </span>
           </BorderBeam>
         </motion.div>
@@ -107,9 +107,10 @@ export function Hero() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.6, ease }}
         >
-          Type a part number, ask about material, sizes, drawing notes, operations or times, and get a plain
-          answer linked to the exact spreadsheet cell or drawing callout. Where the two files disagree, it
-          shows both. If the files don&apos;t say, it tells you so.
+          Type a part number, ask about material, sizes, holes, drawing notes, operations or times, and get a
+          plain answer linked to the exact spreadsheet cell, drawing callout or 3D model feature. Where the
+          files disagree, it shows every value and which file differs. If the files don&apos;t say, it tells
+          you so.
         </motion.p>
 
         <motion.form

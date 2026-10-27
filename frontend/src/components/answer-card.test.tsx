@@ -186,6 +186,10 @@ describe("AnswerCard", () => {
               excel_value: "Ø30",
               pdf_value: "Ø30",
               detail: "Both say Ø30.",
+              iges: [],
+              sides: [],
+              pairs: {},
+              dissent: [],
             },
             {
               field: "outer_diameter",
@@ -196,6 +200,10 @@ describe("AnswerCard", () => {
               excel_value: "Ø50",
               pdf_value: "Ø48",
               detail: "Different diameters.",
+              iges: [],
+              sides: [],
+              pairs: {},
+              dissent: [],
             },
           ],
         }}

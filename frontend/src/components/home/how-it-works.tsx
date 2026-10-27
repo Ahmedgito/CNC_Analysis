@@ -19,7 +19,7 @@ const STEPS = [
   {
     Icon: Bot,
     title: "Ask the model",
-    body: "Claude, with Groq as fallback, returns structured JSON that must cite the cells and drawing callouts it used.",
+    body: "Claude, with Groq as fallback, returns structured JSON that must cite the cells, drawing callouts and model features it used.",
   },
   {
     Icon: ShieldCheck,

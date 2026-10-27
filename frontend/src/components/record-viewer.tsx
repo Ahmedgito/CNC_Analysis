@@ -3,6 +3,7 @@
 import {
   AlertTriangle,
   ArrowLeftRight,
+  Box,
   EyeOff,
   FileSpreadsheet,
   FileText,
@@ -13,14 +14,18 @@ import {
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import type { CellRef, DrawingSlice, PartRecord, SheetSlice } from "@/lib/api/schemas";
+import type { CellRef, DrawingSlice, ModelSlice, PartRecord, SheetSlice } from "@/lib/api/schemas";
+import { modelFactId } from "@/lib/api/schemas";
 import { cn } from "@/lib/cn";
+import { useFactSelection } from "@/lib/selection";
 import { CrossCheckList } from "./cross-checks";
 import { DrawingViewer } from "./drawing-viewer";
+import { ModelPanel } from "./model/model-panel";
 import { AnimatedTabs } from "./ui/animated-tabs";
 
 const sheetKey = (s: SheetSlice) => `${s.file}::${s.sheet}`;
 const drawingKey = (d: DrawingSlice) => `pdf::${d.file}`;
+const modelKey = (m: ModelSlice) => `iges::${m.file}`;
 const CHECKS = "checks";
 
 function HistoryTag({ reason }: { reason?: string | null }) {
@@ -35,6 +40,8 @@ function HistoryTag({ reason }: { reason?: string | null }) {
 }
 
 function CellText({ cell, selected }: { cell: CellRef; selected: boolean }) {
+  // The same field in another file is selected: outline this cell too (linked selection).
+  const related = useFactSelection().isRelated(cell.cell_id) && !selected;
   return (
     <span
       data-cell-id={cell.cell_id}
@@ -42,6 +49,7 @@ function CellText({ cell, selected }: { cell: CellRef; selected: boolean }) {
       className={cn(
         "relative inline-block rounded-md px-1 py-0.5 transition-colors duration-300",
         selected && "bg-amber-200/80 text-amber-950 dark:bg-amber-400/20 dark:text-amber-100",
+        related && "bg-amber-100/60 ring-1 ring-amber-300 ring-dashed dark:bg-amber-400/10",
         cell.hidden && "text-zinc-500 italic",
       )}
     >
@@ -193,7 +201,9 @@ export function RecordViewer({
     ? sheetKey(record.sheets[0])
     : record.drawings[0]
       ? drawingKey(record.drawings[0])
-      : "";
+      : record.models[0]
+        ? modelKey(record.models[0])
+        : "";
   const [active, setActive] = useState(firstTab);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -204,6 +214,8 @@ export function RecordViewer({
       for (const b of s.banner) map.set(b.cell_id, sheetKey(s));
     }
     for (const d of record.drawings) for (const f of d.facts) map.set(f.fact_id, drawingKey(d));
+    for (const m of record.models)
+      for (const f of m.features) map.set(modelFactId(m, f.feature_id), modelKey(m));
     return map;
   }, [record]);
 
@@ -250,17 +262,24 @@ export function RecordViewer({
 
   const sheet = record.sheets.find((s) => sheetKey(s) === active);
   const drawing = record.drawings.find((d) => drawingKey(d) === active);
+  const model = record.models.find((m) => modelKey(m) === active);
   const showChecks = active === CHECKS && record.cross_checks.length > 0;
-  const current = sheet ?? (drawing || showChecks ? undefined : record.sheets[0]);
+  const current = sheet ?? (drawing || model || showChecks ? undefined : record.sheets[0]);
   const activeKey = showChecks
     ? CHECKS
     : drawing
       ? drawingKey(drawing)
-      : current
-        ? sheetKey(current)
-        : firstTab;
+      : model
+        ? modelKey(model)
+        : current
+          ? sheetKey(current)
+          : firstTab;
   const cellCount = record.sheets.reduce((n, s) => n + s.rows.reduce((m, r) => m + r.cells.length, 0), 0);
   const factCount = record.drawings.reduce((n, d) => n + d.facts.length, 0);
+  const featureCount = record.models.reduce(
+    (n, m) => n + m.features.filter((f) => f.kind !== "header").length,
+    0,
+  );
   const disagreements = record.cross_checks.filter((c) => c.verdict === "disagree").length;
 
   return (
@@ -279,6 +298,9 @@ export function RecordViewer({
           {record.sheets.length} sheet{record.sheets.length === 1 ? "" : "s"} · {cellCount} cells
           {record.drawings.length
             ? ` · ${record.drawings.length} drawing${record.drawings.length === 1 ? "" : "s"} · ${factCount} facts`
+            : ""}
+          {record.models.length
+            ? ` · ${record.models.length} model${record.models.length === 1 ? "" : "s"} · ${featureCount} features`
             : ""}
         </p>
       </div>
@@ -320,6 +342,17 @@ export function RecordViewer({
                   <span className="text-xs font-normal text-zinc-400">Rev {d.current_revision}</span>
                 ) : null,
             })),
+            ...record.models.map((m) => ({
+              id: modelKey(m),
+              ariaLabel: `3D model ${m.file}${m.valid ? "" : ", not a closed valid solid"}`,
+              icon: <Box className="size-3.5" aria-hidden />,
+              label: m.file,
+              meta: m.revision ? (
+                <span className="text-xs font-normal text-zinc-400">Rev {m.revision}</span>
+              ) : !m.valid ? (
+                <AlertTriangle className="size-3.5 text-amber-500" aria-hidden />
+              ) : null,
+            })),
             ...(record.cross_checks.length
               ? [
                   {
@@ -351,12 +384,24 @@ export function RecordViewer({
               transition={{ duration: 0.2 }}
             >
               <p className="text-xs text-zinc-500">
-                The app compares the spreadsheet and the drawing field by field, converting units only when
-                the files state them. Nothing is corrected: both values stay cited.
+                The app compares the spreadsheet, the drawing and the 3D model field by field, converting
+                units only when the files state them. When two files agree and one differs, the one that
+                differs is marked. Nothing is corrected: every value stays cited.
               </p>
-              <CrossCheckList
+              <CrossCheckList checks={record.cross_checks} onSelect={onSelectFact} filterable />
+            </motion.div>
+          ) : model ? (
+            <motion.div
+              key={modelKey(model)}
+              initial={{ opacity: 0, x: 12 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -12 }}
+              transition={{ duration: 0.2 }}
+            >
+              <ModelPanel
+                partNumber={record.part_key}
+                model={model}
                 checks={record.cross_checks}
-                selected={selectedFactId}
                 onSelect={onSelectFact}
               />
             </motion.div>

@@ -2,13 +2,13 @@
 
 import {
   ArrowLeftRight,
+  Box,
   Calculator,
   Cog,
   Layers,
   MessageSquareText,
   ShieldQuestion,
   Sparkles,
-  Wrench,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "motion/react";
@@ -31,10 +31,10 @@ type Turn = {
 
 const SUGGESTIONS = [
   { Icon: Layers, q: "What material is it made of?" },
-  { Icon: ArrowLeftRight, q: "Does the drawing agree with the spreadsheet?" },
+  { Icon: ArrowLeftRight, q: "Do the spreadsheet, drawing and 3D model agree?" },
   { Icon: Cog, q: "List the operations in order" },
   { Icon: Calculator, q: "What is the total setup time?" },
-  { Icon: Wrench, q: "Which tools are used?" },
+  { Icon: Box, q: "What is the volume of the 3D model?" },
   { Icon: ShieldQuestion, q: "What is the unit price?" },
 ];
 
@@ -167,8 +167,8 @@ export function ChatPanel({
                   Ask anything about part <span className="font-mono">{partNumber}</span>
                 </p>
                 <p className="mt-1 max-w-sm text-sm text-zinc-500">
-                  Answers come only from its spreadsheets and drawings, and each one links to the cell or
-                  drawing callout it used.
+                  Answers come only from its spreadsheets, drawings and 3D model, and each one links to the
+                  cell, drawing callout or model feature it used.
                 </p>
               </div>
             </motion.div>
@@ -266,11 +266,11 @@ export function ChatPanel({
           placeholders={[
             `Ask about part ${partNumber}…`,
             "What material is it made of?",
-            "Does the drawing agree with the spreadsheet?",
+            "Do the spreadsheet, drawing and 3D model agree?",
             "Which machine runs it?",
             "Stock diameter in inches?",
           ]}
-          focusedPlaceholder="Ask about material, sizes, drawing notes, operations, tools, times…"
+          focusedPlaceholder="Ask about material, sizes, holes, drawing notes, the 3D model, operations, times…"
           suggestions={remaining.slice(0, 4)}
         />
       </div>

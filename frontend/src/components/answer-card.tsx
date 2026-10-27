@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   ArrowLeftRight,
   BookOpen,
+  Box,
   Calculator,
   CheckCircle2,
   ChevronDown,
@@ -112,7 +113,8 @@ export function StatusPill({ status }: { status: AnswerStatus }) {
   );
 }
 
-/** "file › sheet › C2" for a cell, "file › p1 › Dimension › Diameter" for a drawing callout. */
+/** "file › sheet › C2" for a cell, "file › p1 › Dimension › Diameter" for a drawing callout,
+ * "file › Model › Outer diameter" for a measured model feature. */
 export function evidenceLabel(e: Evidence) {
   if (e.locator) return `${e.file} › ${e.locator}`;
   return e.source === "pdf" ? `${e.file} › p${e.page ?? 1}` : `${e.file} › ${e.sheet} › ${e.cell}`;
@@ -120,14 +122,19 @@ export function evidenceLabel(e: Evidence) {
 
 function EvidencePreview({ evidence }: { evidence: Evidence }) {
   const pdf = evidence.source === "pdf";
+  const iges = evidence.source === "iges";
   return (
     <span className="flex flex-col gap-2">
       <span className="flex items-center justify-between gap-2 font-mono text-[11px] text-zinc-500">
         <span className="truncate">
-          {evidence.file} › {pdf ? `page ${evidence.page ?? 1}` : evidence.sheet}
+          {evidence.file} › {iges ? "3D model" : pdf ? `page ${evidence.page ?? 1}` : evidence.sheet}
         </span>
         <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-zinc-700 dark:bg-white/10 dark:text-zinc-200">
-          {pdf ? (evidence.region ?? "drawing").replace("_", " ") : evidence.cell}
+          {iges
+            ? (evidence.feature ?? "feature").replaceAll("_", " ")
+            : pdf
+              ? (evidence.region ?? "drawing").replace("_", " ")
+              : evidence.cell}
         </span>
       </span>
       <span className="text-[11px] tracking-wide text-zinc-500 uppercase">{evidence.header}</span>
@@ -136,8 +143,17 @@ function EvidencePreview({ evidence }: { evidence: Evidence }) {
       </span>
       <span className="flex items-center gap-1 text-[11px] text-cyan-700 dark:text-cyan-300">
         <LocateFixed className="size-3" aria-hidden />
-        {pdf ? "Click to locate this callout on the drawing" : "Click to locate this cell in the record"}
+        {iges
+          ? "Click to show this feature on the 3D model"
+          : pdf
+            ? "Click to locate this callout on the drawing"
+            : "Click to locate this cell in the record"}
       </span>
+      {iges && evidence.method ? (
+        <span className="text-[11px] text-indigo-700 dark:text-indigo-300">
+          Measured by the app from the model&apos;s geometry: {evidence.method}.
+        </span>
+      ) : null}
       {evidence.confidence === "vision" ? (
         <span className="text-[11px] text-violet-700 dark:text-violet-300">
           Read from a scanned image by the vision model. Check it against the drawing before relying on it.
@@ -170,8 +186,9 @@ export function EvidenceChip({
   onSelect?: (factId: string) => void;
 }) {
   const pdf = evidence.source === "pdf";
+  const iges = evidence.source === "iges";
   const vision = evidence.confidence === "vision";
-  const SourceIcon = pdf ? FileText : FileSpreadsheet;
+  const SourceIcon = iges ? Box : pdf ? FileText : FileSpreadsheet;
   return (
     <HoverCard content={<EvidencePreview evidence={evidence} />}>
       <motion.button
@@ -190,7 +207,10 @@ export function EvidenceChip({
         )}
       >
         <SourceIcon
-          className={cn("size-3 shrink-0", pdf ? "text-rose-500" : "text-emerald-600")}
+          className={cn(
+            "size-3 shrink-0",
+            iges ? "text-indigo-500" : pdf ? "text-rose-500" : "text-emerald-600",
+          )}
           aria-hidden
         />
         {evidence.auto_linked ? <Link2 className="size-3 shrink-0" aria-hidden /> : null}
@@ -200,7 +220,7 @@ export function EvidenceChip({
         {evidence.stale ? <History className="size-3 shrink-0" aria-label="history" /> : null}
         <span className="truncate">{evidenceLabel(evidence)}</span>
         <span className="truncate font-sans text-zinc-500 dark:text-zinc-400">
-          · {pdf ? evidence.value : evidence.header}
+          · {pdf || iges ? evidence.value : evidence.header}
         </span>
       </motion.button>
     </HoverCard>
@@ -211,13 +231,13 @@ export function EvidenceChip({
 export const SOURCE_PREVIEW = 4;
 
 /**
- * The first few sources, keeping at least one per source kind (spreadsheet, drawing) so a
- * collapsed answer still shows every file it drew on.
+ * The first few sources, keeping at least one per source kind (spreadsheet, drawing, model) so
+ * a collapsed answer still shows every file it drew on.
  */
 export function previewSources(evidence: Evidence[], n = SOURCE_PREVIEW): Evidence[] {
   if (evidence.length <= n) return evidence;
   const preview = evidence.slice(0, n);
-  for (const kind of ["excel", "pdf"] as const) {
+  for (const kind of ["excel", "pdf", "iges"] as const) {
     const first = evidence.find((e) => e.source === kind);
     if (!first || preview.some((e) => e.source === kind)) continue;
     // Replace the last chip of the kind that has the most chips in the preview.
@@ -280,10 +300,15 @@ export function AnswerCard({
   const sourcesOpen = showAllSources || selectedHidden;
   const shownSources = sourcesOpen ? result.evidence : preview;
   const hiddenCount = result.evidence.length - preview.length;
-  const sourceKinds = {
-    excel: result.evidence.filter((e) => e.source === "excel").length,
-    pdf: result.evidence.filter((e) => e.source === "pdf").length,
-  };
+  const kindCount = (k: Evidence["source"]) => result.evidence.filter((e) => e.source === k).length;
+  // "7 spreadsheet, 5 drawing, 1 model" whenever the answer drew on more than one kind of file.
+  const sourceSummary = (
+    [
+      [kindCount("excel"), "spreadsheet"],
+      [kindCount("pdf"), "drawing"],
+      [kindCount("iges"), "model"],
+    ] as const
+  ).filter(([n]) => n > 0);
   const verified = v && v.citations_checked + v.auto_linked > 0;
 
   return (
@@ -337,8 +362,8 @@ export function AnswerCard({
             Sources
             <span className="font-mono tracking-normal text-zinc-400 normal-case">
               {result.evidence.length}
-              {sourceKinds.excel && sourceKinds.pdf
-                ? ` · ${sourceKinds.excel} spreadsheet, ${sourceKinds.pdf} drawing`
+              {sourceSummary.length > 1
+                ? ` · ${sourceSummary.map(([n, label]) => `${n} ${label}`).join(", ")}`
                 : ""}
             </span>
           </p>
@@ -417,9 +442,9 @@ export function AnswerCard({
       {result.cross_checks.length ? (
         <motion.div variants={reveal} className="flex flex-col gap-1.5">
           <p className="flex items-center gap-1.5 text-[11px] font-medium tracking-[0.15em] text-zinc-500 uppercase">
-            <ArrowLeftRight className="size-3" aria-hidden /> Spreadsheet vs drawing
+            <ArrowLeftRight className="size-3" aria-hidden /> Spreadsheet · drawing · model
           </p>
-          <CrossCheckList checks={result.cross_checks} selected={selectedFactId} onSelect={onSelectFact} />
+          <CrossCheckList checks={result.cross_checks} onSelect={onSelectFact} />
         </motion.div>
       ) : null}
 

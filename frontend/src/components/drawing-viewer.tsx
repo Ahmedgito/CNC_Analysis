@@ -6,6 +6,7 @@ import { useState } from "react";
 import { drawingPageUrl } from "@/lib/api/client";
 import type { DrawingFact, DrawingSlice, Region } from "@/lib/api/schemas";
 import { cn } from "@/lib/cn";
+import { useFactSelection } from "@/lib/selection";
 
 const REGIONS: { region: Region; label: string }[] = [
   { region: "title_block", label: "Title block" },
@@ -62,6 +63,7 @@ export function DrawingViewer({
 }) {
   const factById = new Map(drawing.facts.map((f) => [f.fact_id, f]));
   const selectedFact = selected ? factById.get(selected) : undefined;
+  const { isRelated } = useFactSelection();
   const [page, setPage] = useState(selectedFact?.page ?? 1);
   const [zoom, setZoom] = useState(false);
   const [hovered, setHovered] = useState<string | null>(null);
@@ -162,6 +164,7 @@ export function DrawingViewer({
             ? boxes.map(({ fact, b, first }, i) => {
                 const isSelected = fact.fact_id === selected;
                 const isHovered = fact.fact_id === hovered;
+                const isLinked = !isSelected && isRelated(fact.fact_id);
                 return (
                   <button
                     key={`${fact.fact_id}-${i}`}
@@ -178,9 +181,11 @@ export function DrawingViewer({
                         ? "z-10 bg-amber-300/35 ring-2 ring-amber-500"
                         : isHovered
                           ? "bg-cyan-400/25 ring-2 ring-cyan-500"
-                          : fact.stale
-                            ? "ring-1 ring-zinc-400/40 hover:bg-zinc-400/10"
-                            : "ring-1 ring-cyan-500/35 hover:bg-cyan-400/15",
+                          : isLinked
+                            ? "z-10 bg-amber-200/30 ring-2 ring-amber-400/80 ring-dashed"
+                            : fact.stale
+                              ? "ring-1 ring-zinc-400/40 hover:bg-zinc-400/10"
+                              : "ring-1 ring-cyan-500/35 hover:bg-cyan-400/15",
                     )}
                     style={{
                       left: `calc(${pct(b[0], meta.width)} - 2px)`,
