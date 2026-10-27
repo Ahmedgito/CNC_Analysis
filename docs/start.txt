@@ -1,0 +1,2 @@
+cd backend;  uv run cnc serve --port 8000
+cd frontend; pnpm dev
