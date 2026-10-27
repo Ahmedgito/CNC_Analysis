@@ -10,6 +10,8 @@ export const SourceStatus = z.object({
   readable: z.boolean().nullable().optional(),
   scanned: z.array(z.string()).default([]),
   current_revision: z.string().nullable().optional(),
+  /** IGES only: true when the current model is one closed, valid solid. */
+  valid: z.boolean().nullable().optional(),
 });
 export type SourceStatus = z.infer<typeof SourceStatus>;
 
@@ -121,24 +123,117 @@ export const Verdict = z.enum([
   "agree",
   "agree_after_conversion",
   "equivalent_by_convention",
+  "within_tolerance",
+  "consistent",
+  "not_modelled",
   "disagree",
   "excel_only",
   "pdf_only",
+  "iges_only",
   "not_comparable",
 ]);
 export type Verdict = z.infer<typeof Verdict>;
 
+export const SourceKind = z.enum(["excel", "pdf", "iges"]);
+export type SourceKind = z.infer<typeof SourceKind>;
+
+export const CheckSide = z.object({
+  source: SourceKind,
+  facts: z.array(z.string()).default([]),
+  value: z.string().nullable().optional(),
+  normalised: z.string().nullable().optional(),
+  note: z.string().nullable().optional(),
+});
+export type CheckSide = z.infer<typeof CheckSide>;
+
+/** One field compared across the spreadsheet, the drawing and the 3D model. */
 export const CrossCheck = z.object({
   field: z.string(),
   label: z.string(),
   verdict: Verdict,
   excel: z.array(z.string()).default([]),
   pdf: z.array(z.string()).default([]),
+  iges: z.array(z.string()).default([]),
   excel_value: z.string().nullable().optional(),
   pdf_value: z.string().nullable().optional(),
+  iges_value: z.string().nullable().optional(),
+  sides: z.array(CheckSide).default([]),
+  /** "excel~pdf" | "excel~iges" | "pdf~iges" -> verdict for that pair of files. */
+  pairs: z.record(z.string(), Verdict).default({}),
+  odd_one_out: SourceKind.nullable().optional(),
+  /** Fact ids of the statements that differ from the rest. */
+  dissent: z.array(z.string()).default([]),
   detail: z.string(),
 });
 export type CrossCheck = z.infer<typeof CrossCheck>;
+
+export const ModelFeature = z.object({
+  feature_id: z.string(),
+  kind: z.enum([
+    "header",
+    "envelope",
+    "body",
+    "boss",
+    "bore",
+    "hole",
+    "hole_pattern",
+    "counterbore",
+    "chamfer",
+    "fillet",
+  ]),
+  label: z.string(),
+  canonical: z.string().nullable().optional(),
+  value: z.string(),
+  numbers: z.record(z.string(), z.number()).default({}),
+  unit: z.string().nullable().optional(),
+  confidence: z.enum(["exact", "inferred", "vision", "measured"]).default("measured"),
+  method: z.string().default(""),
+  faces: z.array(z.number()).default([]),
+  anchor: z.array(z.number()).nullable().optional(),
+  axis: z.array(z.number()).nullable().optional(),
+  segments: z.array(z.array(z.number())).default([]),
+  stale: z.boolean().default(false),
+  stale_reason: z.string().nullable().optional(),
+});
+export type ModelFeature = z.infer<typeof ModelFeature>;
+
+export const ModelSlice = z.object({
+  file: z.string(),
+  file_stem: z.string(),
+  sha256: z.string(),
+  header: z.object({
+    sending_system: z.string().nullable().optional(),
+    units: z.string().nullable().optional(),
+    units_declared: z.boolean().default(true),
+    created: z.string().nullable().optional(),
+  }),
+  topology: z.enum(["solid", "multi_solid", "open_shell", "wireframe", "empty"]),
+  valid: z.boolean().default(false),
+  bodies: z.number().default(0),
+  faces: z.number().default(0),
+  part_number: z.string().nullable().optional(),
+  part_number_source: z.enum(["header", "filename"]).nullable().optional(),
+  revision: z.string().nullable().optional(),
+  form: z.enum(["turned", "prismatic", "unknown"]).default("unknown"),
+  features: z.array(ModelFeature).default([]),
+  mesh: z
+    .object({
+      lods: z.array(z.number()),
+      triangles: z.record(z.string(), z.number()).default({}),
+      bounds: z.array(z.array(z.number())).nullable().optional(),
+    })
+    .nullable()
+    .optional(),
+  views: z.array(z.string()).default([]),
+  kernel: z.string().default(""),
+  extractor_version: z.number().default(1),
+  warnings: z.array(z.string()).default([]),
+});
+export type ModelSlice = z.infer<typeof ModelSlice>;
+
+/** The citable id of a model feature, as the backend builds it. */
+export const modelFactId = (m: Pick<ModelSlice, "file_stem">, featureId: string) =>
+  `${m.file_stem}!m!${featureId}`;
 
 export const PartRecord = z.object({
   part_key: z.string(),
@@ -150,6 +245,7 @@ export const PartRecord = z.object({
   available_fields: z.array(z.string()),
   warnings: z.array(z.string()).default([]),
   drawings: z.array(DrawingSlice).default([]),
+  models: z.array(ModelSlice).default([]),
   cross_checks: z.array(CrossCheck).default([]),
   aliases: z.array(z.string()).default([]),
 });
@@ -184,7 +280,7 @@ export type AnswerStatus = z.infer<typeof AnswerStatus>;
 /** One verified fact behind an answer: a spreadsheet cell or a value printed on a drawing. */
 export const Evidence = z.object({
   fact_id: z.string(),
-  source: z.enum(["excel", "pdf"]).default("excel"),
+  source: SourceKind.default("excel"),
   file: z.string(),
   locator: z.string().default(""),
   header: z.string(),
@@ -193,7 +289,7 @@ export const Evidence = z.object({
   quoted: z.string(),
   hidden: z.boolean().default(false),
   stale: z.boolean().default(false),
-  confidence: z.enum(["exact", "inferred", "vision"]).default("exact"),
+  confidence: z.enum(["exact", "inferred", "vision", "measured"]).default("exact"),
   auto_linked: z.boolean().default(false),
   sheet: z.string().nullable().optional(),
   cell: z.string().nullable().optional(),
@@ -201,6 +297,9 @@ export const Evidence = z.object({
   page: z.number().nullable().optional(),
   region: z.string().nullable().optional(),
   bbox: z.array(z.number()).nullable().optional(),
+  feature: z.string().nullable().optional(),
+  method: z.string().nullable().optional(),
+  anchor: z.array(z.number()).nullable().optional(),
 });
 export type Evidence = z.infer<typeof Evidence>;
 

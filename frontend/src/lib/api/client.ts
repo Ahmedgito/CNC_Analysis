@@ -56,6 +56,23 @@ export function drawingPageUrl(partNumber: string, file: string, page: number, d
   return `${API_BASE}/parts/${encodeURIComponent(partNumber)}/drawings/${encodeURIComponent(file)}/pages/${page}.png?dpi=${dpi}`;
 }
 
+const modelBase = (partNumber: string, file: string) =>
+  `${API_BASE}/parts/${encodeURIComponent(partNumber)}/models/${encodeURIComponent(file)}`;
+
+/**
+ * Binary glTF of a model: one mesh per measured feature (node name = feature id). Artifacts are
+ * served as immutable, so the extractor version is part of the URL: a rebuilt mesh gets a new
+ * cache key instead of a stale browser copy.
+ */
+export function modelMeshUrl(partNumber: string, file: string, lod: 0 | 1 = 1, version = 1) {
+  return `${modelBase(partNumber, file)}/mesh.glb?lod=${lod}&v=${version}`;
+}
+
+/** Hidden-line projection of a model as SVG (front, top or right). */
+export function modelViewUrl(partNumber: string, file: string, view: string, version = 1) {
+  return `${modelBase(partNumber, file)}/views/${encodeURIComponent(view)}.svg?v=${version}`;
+}
+
 export type AskOptions = {
   conversationId?: string | null;
   signal?: AbortSignal;
