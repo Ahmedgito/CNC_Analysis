@@ -3,7 +3,8 @@
 It exists so CI, the eval harness and keyless demos exercise the full pipeline (verifier,
 compute engine, cross-check, persistence, UI) with predictable output. It reads only the prompt
 text, the same input a real model gets, and follows the same rules: cite facts, name files,
-never use stale history as current, report cross-check verdicts, ask before reading a scan.
+never use stale history as current, report cross-check verdicts, ask before reading a scan, and
+never take material, tolerance or weight from a 3D model.
 It is labelled "offline-rules" everywhere it appears.
 """
 
@@ -19,12 +20,15 @@ from app.llm.schemas import AnswerDraft, Computation, ComputationInput, Evidence
 
 _FACT_RE = re.compile(
     r"^\s+\[(?P<id>[^\]]+)\] (?P<label>.*?)(?: -> (?P<canon>\w+))?(?: unit=(?P<unit>\S+))?"
-    r"(?P<flags>(?: (?:hidden|stale|inferred|vision))*) = (?P<val>\".*\")$"
+    r"(?P<flags>(?: (?:hidden|stale|inferred|vision|measured))*) = (?P<val>\".*\")$"
 )
 _ROW_RE = re.compile(r"^  row (?P<row>\d+):")
 _SHEET_RE = re.compile(r'^<sheet file=(?P<file>"[^"]*") sheet=(?P<sheet>"[^"]*")')
 _DRAWING_RE = re.compile(r'^<drawing file=(?P<file>"[^"]*").*readable="(?P<readable>\w+)"')
-_CHECK_RE = re.compile(r"^  - (?P<label>[^:]+): (?P<verdict>[A-Z_]+) — (?P<detail>\".*\")")
+_MODEL_RE = re.compile(r'^<model file=(?P<file>"[^"]*")')
+_CHECK_RE = re.compile(
+    r"^  - (?P<label>[^:]+): (?P<verdict>[A-Z_]+)(?P<extra>[^—]*)— (?P<detail>\".*\")"
+)
 _QUESTION_RE = re.compile(r"<question>(?P<q>.*)</question>", re.S)
 _INJECTION_RE = re.compile(
     r"ignore (all|any|the|your|previous)|disregard|system prompt|you are now|pretend|"
@@ -39,7 +43,25 @@ _OUT_OF_SCOPE = {
     "colour": ("colour", "color"),
     "supplier": ("supplier", "vendor"),
 }
-_MODEL_WORDS = ("iges", "3d", "cad", "model file", "volume", "3-d")
+_MODEL_WORDS = ("iges", "3d", "cad", "model", "model file", "volume", "3-d")
+# Questions only a 3D model answers, checked before the spreadsheet field keywords.
+_MODEL_KEYWORDS: list[tuple[tuple[str, ...], str]] = [
+    (("volume",), "volume"),
+    (("surface area",), "surface_area"),
+    (("envelope", "bounding box", "overall dimensions", "overall size"), "envelope"),
+    (("unit", "units"), "units"),
+]
+# What a 3D model can never state.
+_NOT_IN_MODEL = ("material", "tolerance", "surface_finish", "heat_treatment")
+# Model facts that answer a field, by the model fact's canonical name.
+_MODEL_FIELD = {
+    "outer_diameter": ("outer_diameter",),
+    "bore": ("bore",),
+    "thickness": ("thickness",),
+    "holes": ("hole_pattern", "hole"),
+    "finished_size": ("envelope",),
+    "revision": ("revision",),
+}
 _DRAWING_WORDS = ("drawing", "pdf", "title block", "drawn by", "scale")
 _FIELD_KEYWORDS: list[tuple[tuple[str, ...], str]] = [
     (("operation", "routing", "process steps", "ops", "sequence"), "operation"),
@@ -84,6 +106,9 @@ _CHECK_FIELD = {
     "Threaded holes": "holes",
     "General tolerance": "tolerance",
     "Surface finish": "surface_finish",
+    "Length / overall size": "finished_size",
+    "Raw stock vs model": "raw_stock",
+    "Chamfers": "chamfer",
 }
 _SIZE_FIELDS = {"outer_diameter", "bore", "thickness"}
 
@@ -100,6 +125,7 @@ class _Fact:
     sheet: str | None
     drawing: bool
     stale: bool
+    model: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -114,14 +140,16 @@ class _Parsed:
     facts: list[_Fact]
     checks: list[_Check]
     drawings: dict[str, bool]  # file -> readable
+    models: list[str]  # model files
 
 
 def _parse(user: str) -> _Parsed:
     facts: list[_Fact] = []
     checks: list[_Check] = []
     drawings: dict[str, bool] = {}
+    models: list[str] = []
     in_primary = False
-    file, sheet, group, is_drawing = "", None, "", False
+    file, sheet, group, is_drawing, is_model = "", None, "", False, False
     for line in user.splitlines():
         if line.startswith('<part_record role="primary"'):
             in_primary = True
@@ -130,16 +158,21 @@ def _parse(user: str) -> _Parsed:
         if not in_primary:
             continue
         if m := _SHEET_RE.match(line):
-            file, sheet, is_drawing = (
+            file, sheet, is_drawing, is_model = (
                 json.loads(m.group("file")),
                 json.loads(m.group("sheet")),
+                False,
                 False,
             )
             group = f"{file}!{sheet}"
         elif m := _DRAWING_RE.match(line):
-            file, sheet, is_drawing = json.loads(m.group("file")), None, True
+            file, sheet, is_drawing, is_model = json.loads(m.group("file")), None, True, False
             group = file
             drawings[file] = m.group("readable") == "true"
+        elif m := _MODEL_RE.match(line):
+            file, sheet, is_drawing, is_model = json.loads(m.group("file")), None, False, True
+            group = file
+            models.append(file)
         elif (m := _ROW_RE.match(line)) and not is_drawing:
             group = f"{file}!{sheet}!r{m.group('row')}"
         elif m := _CHECK_RE.match(line):
@@ -159,9 +192,10 @@ def _parse(user: str) -> _Parsed:
                     sheet=sheet,
                     drawing=is_drawing,
                     stale="stale" in (m.group("flags") or ""),
+                    model=is_model,
                 )
             )
-    return _Parsed(facts, checks, drawings)
+    return _Parsed(facts, checks, drawings, models)
 
 
 @lru_cache(maxsize=512)
@@ -192,6 +226,8 @@ def _ev(facts: list[_Fact]) -> list[EvidenceItem]:
 
 
 def _source(f: _Fact) -> str:
+    if f.model:
+        return f"measured from the 3D model {f.file}"
     return f"the drawing {f.file}" if f.drawing else f"the {f.sheet} sheet of {f.file}"
 
 
@@ -203,9 +239,11 @@ def rules_answer(user: str) -> AnswerDraft:
     current = [f for f in parsed.facts if not f.stale]
     sheet_by: dict[str, list[_Fact]] = {}
     drawing_by: dict[str, list[_Fact]] = {}
+    model_by: dict[str, list[_Fact]] = {}
     for f in current:
         if f.canonical:
-            (drawing_by if f.drawing else sheet_by).setdefault(f.canonical, []).append(f)
+            target = model_by if f.model else drawing_by if f.drawing else sheet_by
+            target.setdefault(f.canonical, []).append(f)
     unread = [file for file, readable in parsed.drawings.items() if not readable]
 
     if _INJECTION_RE.search(question):
@@ -228,14 +266,38 @@ def rules_answer(user: str) -> AnswerDraft:
                 reason="no matching field in the record",
             )
 
-    if _has(q, _MODEL_WORDS):
+    asks_model = _has(q, _MODEL_WORDS)
+    if asks_model and not parsed.models:
         return _draft(
             "not_in_record",
-            "I can't find that in the provided files: it needs the 3D (IGES) model, which is "
-            "not available for this part.",
+            "I can't find that in the provided files: it needs the 3D (IGES) model, and no 3D "
+            "model is available for this part.",
             missing=["3D model information"],
             reason="requires a source that is not ingested",
         )
+    if parsed.models:
+        for words, canon in _MODEL_KEYWORDS:
+            if _has(q, words) and (canon != "units" or asks_model):
+                hits = model_by.get(canon, [])
+                if hits:
+                    f = hits[0]
+                    return _draft(
+                        "answered",
+                        f"{f.label}: {f.value} ({_source(f)}).",
+                        evidence=_ev([f]),
+                    )
+        if asks_model:
+            for words, canon in _FIELD_KEYWORDS:
+                if _has(q, words) and canon in _NOT_IN_MODEL:
+                    label = canon.replace("_", " ")
+                    return _draft(
+                        "not_in_record",
+                        f"The 3D model {parsed.models[0]} does not record the {label}: a model "
+                        "holds geometry only. Ask about the "
+                        f"{label} itself to see what the spreadsheet and drawing state.",
+                        missing=[f"{label} in the 3D model"],
+                        reason="a model never states this",
+                    )
 
     asks_drawing = _has(q, _DRAWING_WORDS)
     if asks_drawing and not parsed.drawings:
@@ -288,10 +350,12 @@ def rules_answer(user: str) -> AnswerDraft:
 
     for words, canon in _FIELD_KEYWORDS:
         if _has(q, words):
-            return _field_answer(canon, parsed, sheet_by, drawing_by, unread)
+            return _field_answer(canon, parsed, sheet_by, drawing_by, unread, model_by)
 
     if asks_drawing:
         return _drawing_summary(parsed, unread)
+    if asks_model:
+        return _model_summary(parsed, model_by)
 
     return _draft(
         "clarify",
@@ -308,8 +372,12 @@ def _field_answer(
     sheet_by: dict[str, list[_Fact]],
     drawing_by: dict[str, list[_Fact]],
     unread: list[str],
+    model_by: dict[str, list[_Fact]] | None = None,
 ) -> AnswerDraft:
     label = canon.replace("_", " ")
+    model_hits = [f for key in _MODEL_FIELD.get(canon, ()) for f in (model_by or {}).get(key, [])]
+    if canon == "holes" and not model_hits:
+        model_hits = (model_by or {}).get("holes", [])
     sheet_hits = sheet_by.get(canon, [])
     if canon in _SIZE_FIELDS:
         sheet_hits = sheet_by.get("finished_size", [])
@@ -322,7 +390,7 @@ def _field_answer(
         drawing_hits = drawing_hits[:1]
     check = next((c for c in parsed.checks if c.field == canon), None)
 
-    if not sheet_hits and not drawing_hits:
+    if not sheet_hits and not drawing_hits and not model_hits:
         if unread:
             return _draft(
                 "needs_consent",
@@ -361,6 +429,7 @@ def _field_answer(
         for f in unique.values()
     ]
     parts += [f"{f.value} ({f.label}, per {_source(f)})" for f in drawing_hits]
+    parts += [f"{f.value} ({f.label}, {_source(f)})" for f in model_hits]
     answer = f"{label.capitalize()}: " + "; ".join(parts) + "."
     confidence = "high"
     if check:
@@ -373,7 +442,27 @@ def _field_answer(
             "checked."
         )
     return _draft(
-        "answered", answer, evidence=_ev([*unique.values(), *drawing_hits]), confidence=confidence
+        "answered",
+        answer,
+        evidence=_ev([*unique.values(), *drawing_hits, *model_hits]),
+        confidence=confidence,
+    )
+
+
+def _model_summary(parsed: _Parsed, model_by: dict[str, list[_Fact]]) -> AnswerDraft:
+    keep = ("envelope", "outer_diameter", "step", "bore", "hole_pattern", "hole", "volume")
+    facts = [f for key in keep for f in model_by.get(key, [])]
+    if not facts:
+        return _draft(
+            "not_in_record",
+            "I can't find that in the provided files: the 3D model has no measurable features.",
+            missing=["3D model features"],
+        )
+    lines = [f"- {f.label}: {f.value}" for f in facts]
+    return _draft(
+        "answered",
+        f"Measured from the 3D model {parsed.models[0]}:\n" + "\n".join(lines),
+        evidence=_ev(facts),
     )
 
 

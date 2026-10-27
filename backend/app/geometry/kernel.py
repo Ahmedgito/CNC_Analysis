@@ -191,7 +191,7 @@ def process_model(
         revision=revision,
         revision_source="filename" if revision else None,
         form=geometry.form,
-        features=_header_features(header) + geometry.features,
+        features=_header_features(header, revision, file_name) + geometry.features,
         kernel=kernel_version(),
         extractor_version=EXTRACTOR_VERSION,
         warnings=warnings,
@@ -221,8 +221,21 @@ def _plain_kernel_error(exc: BaseException) -> str:
     return f"the geometry kernel failed ({name}{': ' + text if text else ''})"
 
 
-def _header_features(h) -> list[ModelFeature]:
+def _header_features(h, revision: str | None = None, file_name: str = "") -> list[ModelFeature]:
     out: list[ModelFeature] = []
+    if revision:
+        out.append(
+            ModelFeature(
+                feature_id="hdr.revision",
+                kind="header",
+                label="Revision (from the file name)",
+                canonical="revision",
+                value=revision,
+                unit=None,
+                confidence="inferred",
+                method=f"read from the file name {file_name}; IGES has no revision field",
+            )
+        )
     if h.units:
         how = (
             f"Global section units flag {h.units_flag}"

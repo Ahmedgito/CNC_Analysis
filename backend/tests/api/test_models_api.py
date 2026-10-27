@@ -191,6 +191,67 @@ def test_model_without_a_part_number_is_kept_unlinked(full):
     assert [m["file"] for m in unlinked] == ["shaft_model.igs"]
 
 
+# -------------------------------------------------------------------------------- answers
+
+
+def _ask(client: TestClient, part: str, question: str) -> dict:
+    resp = client.post(f"/api/v1/parts/{part}/ask", json={"question": question})
+    assert resp.status_code == 200, resp.text
+    return resp.json()
+
+
+def test_answer_cites_all_three_files_and_names_the_odd_one(full):
+    client, _ = full
+    r = _ask(client, "2283", "What is the outer diameter?")
+    assert r["status"] == "answered"
+    by_source = {e["source"]: e for e in r["evidence"]}
+    assert set(by_source) == {"excel", "pdf", "iges"}
+    model = by_source["iges"]
+    assert model["fact_id"] == "2283_bushing!m!od_1" and model["confidence"] == "measured"
+    assert model["locator"] == "Model › Outer diameter" and model["anchor"]
+    assert "2283_bushing.igs" in r["answer"]
+    od = next(c for c in r["cross_checks"] if c["field"] == "outer_diameter")
+    assert od["odd_one_out"] == "excel"
+
+
+def test_volume_comes_from_the_model(full):
+    client, _ = full
+    r = _ask(client, "2280", "What is the volume of the 3D model?")
+    assert r["status"] == "answered"
+    cited = [e["fact_id"] for e in r["evidence"] if not e["auto_linked"]]
+    assert cited == ["2280_flange!m!volume"]
+    assert "191637.15" in r["answer"]
+
+
+def test_no_model_means_not_found(full):
+    client, _ = full
+    r = _ask(client, "2284", "What is the volume of the 3D model?")
+    assert r["status"] == "not_found" and "no 3D model" in r["answer"]
+    assert r["sources"]["iges"]["available"] is False
+
+
+def test_weight_is_never_derived_from_volume(full):
+    client, _ = full
+    r = _ask(client, "2281", "How much does the part weigh?")
+    assert r["status"] == "not_found"
+    assert not any(ch.isdigit() for ch in r["answer"].split("contain")[0])
+
+
+def test_a_model_states_no_material(full):
+    client, _ = full
+    r = _ask(client, "2283", "What material does the 3D model specify?")
+    assert r["status"] == "not_found" and "does not record the material" in r["answer"]
+
+
+def test_scan_part_is_answered_from_sheet_and_model(full):
+    client, _ = full
+    r = _ask(client, "3001", "What is the bore diameter?")
+    assert r["status"] == "answered"
+    assert {e["source"] for e in r["evidence"]} >= {"excel", "iges"}
+    assert "scanned image" in r["answer"]
+
+
+# Truncates the shared database, so it runs last in this module.
 def test_older_model_revision_is_history(db_url, tmp_path):
     _truncate(db_url)
     hub = (DATA / "3002_coupling_hub_RevB.igs").read_bytes()
