@@ -817,9 +817,45 @@
         <a class="nav-btn primary" href="http://localhost:3000" target="_blank" style="padding: 12px 26px; font-size: 0.95rem;">
           <i class="fa-solid fa-play"></i> Open Live Application
         </a>
-        <button class="nav-btn" onclick="goToSlide(0)" style="padding: 12px 22px;">
-          <i class="fa-solid fa-rotate-left"></i> Replay Pitch
+        <button class="nav-btn" onclick="nextSlide()" style="padding: 12px 22px;">
+          Suggestions & Q&A <i class="fa-solid fa-arrow-right"></i>
         </button>
+      </div>
+    </div>
+
+    <!-- SLIDE 7: Feedback & Open Discussion -->
+    <div class="slide" id="slide-6" data-part="flange" data-script="Judges, you have decades of combined experience in mission-critical manufacturing and aerospace hardware. We built this foundation with deterministic engineering rigor, but true industrial excellence comes from collaboration. We would love your technical critique, suggestions, and feedback on how we can evolve this system further. The floor is open for your insights.">
+      <div class="slide-tag">
+        <div class="tag-indicator" style="background: var(--blue); box-shadow: 0 0 10px var(--blue);"></div>
+        Collaborative Engineering & Q&A
+      </div>
+      <h2 class="slide-headline">Where would you <br><span class="accent">take this next?</span></h2>
+      <p class="slide-body">
+        We built this foundation for mission-critical manufacturing. We welcome your technical critique, suggestions, and ideas for expansion:
+      </p>
+
+      <div class="card-row">
+        <div class="simple-card">
+          <h3><i class="fa-solid fa-ruler-combined" style="color: var(--cyan);"></i> GD&T & Feature Tolerances</h3>
+          <p>Expanding nominal B-Rep checks to automated ASME Y14.5 profile tolerances, concentricity, and surface finish (Ra) compliance.</p>
+        </div>
+        <div class="simple-card">
+          <h3><i class="fa-solid fa-network-wired" style="color: #34d399;"></i> Direct Machine Tool Interlocks</h3>
+          <p>Pushing automated quarantine holds directly to Fanuc, Siemens Sinumerik, and Haas controllers via MTConnect / OPC-UA before cycle start.</p>
+        </div>
+        <div class="simple-card span-2" style="background: rgba(59, 130, 246, 0.1); border-color: rgba(59, 130, 246, 0.3);">
+          <h3 style="color: #93c5fd;"><i class="fa-solid fa-comments"></i> Open Floor for Judges & Mentors</h3>
+          <p>What edge cases, inspection protocols, or shopfloor integration hurdles would you prioritize next? We welcome your questions and suggestions.</p>
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 16px; margin-top: 26px;">
+        <button class="nav-btn" onclick="goToSlide(0)">
+          <i class="fa-solid fa-rotate-left"></i> Replay From Slide 1
+        </button>
+        <a class="nav-btn primary" href="http://localhost:3000" target="_blank">
+          <i class="fa-solid fa-play"></i> Live App
+        </a>
       </div>
     </div>
 
@@ -851,6 +887,10 @@
       <div class="jump-item" onclick="goToSlide(5)">
         <div class="jump-dot"></div>
         <span class="jump-label">06 Demo</span>
+      </div>
+      <div class="jump-item" onclick="goToSlide(6)">
+        <div class="jump-dot"></div>
+        <span class="jump-label">07 Feedback</span>
       </div>
     </div>
 
@@ -921,7 +961,7 @@
       if (e.key === 'p' || e.key === 'P') toggleNotes();
       if (e.key === 'l' || e.key === 'L') toggleLaser();
       if (e.key === 'f' || e.key === 'F') toggleFullScreen();
-      if (e.key >= '1' && e.key <= '6') goToSlide(parseInt(e.key) - 1);
+      if (e.key >= '1' && e.key <= '7') goToSlide(parseInt(e.key) - 1);
     });
 
     // Speaker Script Drawer
