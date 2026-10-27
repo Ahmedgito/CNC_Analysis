@@ -1,0 +1,21 @@
+{
+  "_note": "Synthetic HARD-MODE batch. Answer key for YOU only; do not feed to the app. Dimensions in mm.",
+  "3001": {"name": "Gear Blank", "material": "EN24", "bbox_mm": [80, 80, 15], "features": "bore D25",
+           "pdf": "SCANNED image-only (no extractable text) - needs OCR or a vision LLM",
+           "excel": "Master List 'P-3001' (prefix). Archive_2025 sheet has OBSOLETE row: EN19, bore 22 - must not be used as current."},
+  "3002": {"name": "Coupling Hub", "material": "EN8", "bbox_mm": [55, 55, 40], "features": "bore D20, 1 x M6 radial tapped",
+           "pdf": "2 pages: page 1 = revision history (mentions OLD values D18/C45), page 2 = drawing Rev B",
+           "excel": "Master List has TWO rows 'P-3002': Rev A (SUPERSEDED, bore 18, C45) and Rev B (Released, bore 20, EN8). Correct answer = Rev B."},
+  "3003": {"name": "Base Plate", "material": "IS 2062 E250 mild steel", "bbox_mm": [200, 120, 15], "features": "4 x D14 holes, 20 mm from edges",
+           "pdf": "scale 1:2, material appears ONLY in note 3 (title block says SEE NOTE 3)",
+           "excel": "Master List '003003' (leading zeros, text). Part Card 3003 (vertical layout, minutes) says 6 holes = STALE.",
+           "planted_issue": "MISMATCH inside Excel: Part Card 6 holes vs Master List 4 holes; PDF says 4. Also raw stock 205x125x16 is normal."},
+  "3004": {"name": "Shaft Collar", "material": "AISI 1018", "bbox_mm": [50.8, 50.8, 19.05], "features": "bore D25.4",
+           "pdf": "all dimensions in mm",
+           "excel": "Master List '3004-A', all dims in INCHES (2.000 x 0.750, bore 1.000). Must convert; values AGREE with PDF -> should NOT be flagged."},
+  "general": ["Summary sheet mentions part numbers in free text but holds no part records.",
+              "Master List: header on row 6, merged title cells, separator rows, blank row, abbreviated headers (P/N, Mtl, Est. Time).",
+              "Time is in HOURS on Master List and MINUTES on Part Card.",
+              "Rotated dimension text extracts REVERSED from text PDFs (e.g. 120 -> '021').",
+              "No IGES files included: model each part in FreeCAD from bbox_mm."]
+}
