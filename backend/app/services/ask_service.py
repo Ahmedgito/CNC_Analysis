@@ -28,7 +28,8 @@ from app.domain.answer import (
     StageEvent,
     VerificationOut,
 )
-from app.domain.record import CellRef, PartRecord
+from app.domain.evidence import Fact
+from app.domain.record import PartRecord
 from app.ingestion.cells import normalize_for_match
 from app.ingestion.parts import normalize_part_key
 from app.llm.gateway import (
@@ -118,10 +119,10 @@ class AskService:
         started = time.perf_counter()
         try:
             gw = await self._gateway.answer(prompt)
-            cells = self._cell_index(ctx)
+            facts = self._fact_index(ctx)
             draft = gw.draft
-            verification = verify_citations(draft.evidence, cells)
-            feedback = self._reask_feedback(draft, verification, cells)
+            verification = verify_citations(draft.evidence, facts)
+            feedback = self._reask_feedback(draft, verification, facts)
             if feedback:
                 log.info("ask.reask", reason=feedback[:200])
                 retry_prompt = build_prompt(
@@ -134,7 +135,7 @@ class AskService:
                 retry = await self._gateway.answer(retry_prompt)
                 retry.calls = gw.calls + retry.calls
                 gw, draft = retry, retry.draft
-                verification = verify_citations(draft.evidence, cells)
+                verification = verify_citations(draft.evidence, facts)
         except ProviderConfigError as exc:
             await run_in_threadpool(
                 self._save_calls, exc.calls, base, ctx, prompt.prompt_sha256, None
@@ -153,7 +154,7 @@ class AskService:
         yield StageEvent(stage="verifying")
         if draft.status == "needs_computation":
             yield StageEvent(stage="computing")
-        result = self._finalise(base, ctx, gw, draft, verification, cells, started)
+        result = self._finalise(base, ctx, gw, draft, verification, facts, started)
 
         yield StageEvent(stage="saving")
         result = await run_in_threadpool(self._persist, result, ctx, gw, prompt.prompt_sha256)
@@ -211,26 +212,24 @@ class AskService:
             return _Context(record, conv.id, history, extra, notes)
 
     @staticmethod
-    def _cell_index(ctx: _Context) -> dict[str, CellRef]:
-        cells = ctx.record.cell_index()
+    def _fact_index(ctx: _Context) -> dict[str, Fact]:
+        facts = ctx.record.fact_index()
         for extra in ctx.extra_records:
-            cells.update(extra.cell_index())
-        return cells
+            facts.update(extra.fact_index())
+        return facts
 
     @staticmethod
-    def _reask_feedback(
-        draft: AnswerDraft, v: Verification, cells: dict[str, CellRef]
-    ) -> str | None:
+    def _reask_feedback(draft: AnswerDraft, v: Verification, facts: dict[str, Fact]) -> str | None:
         """Why the first answer must be redone (one retry at most), or None if it can stand."""
         if draft.status in ("answered", "needs_computation") and draft.evidence and not v.evidence:
             return (
-                "Your previous answer cited cells that do not match the record: "
-                + "; ".join(f"{d.cell_id}: {d.reason}" for d in v.dropped[:5])
-                + ". Cite cell ids and copy values exactly, or use not_in_record."
+                "Your previous answer cited facts that do not match the record: "
+                + "; ".join(f"{d.fact_id}: {d.reason}" for d in v.dropped[:5])
+                + ". Cite fact ids and copy values exactly, or use not_in_record."
             )
         if draft.status == "needs_computation" and draft.computation is not None:
             try:
-                compute(draft.computation, cells)
+                compute(draft.computation, facts)
             except ComputeError as exc:
                 return (
                     f"Your previous computation was rejected: {exc}. Fix the computation "
@@ -245,7 +244,7 @@ class AskService:
         gw: GatewayResult,
         draft: AnswerDraft,
         v: Verification,
-        cells: dict[str, CellRef],
+        facts: dict[str, Fact],
         started: float,
     ) -> AskResult:
         status = _STATUS_MAP[draft.status]
@@ -262,18 +261,18 @@ class AskService:
                 )
             else:
                 try:
-                    comp = compute(draft.computation, cells)
+                    comp = compute(draft.computation, facts)
                 except ComputeError as exc:
                     status, confidence = "clarify", "low"
                     answer = f"I couldn't compute that reliably from the files: {exc}."
                 else:
-                    known = {e.cell.cell_id for e in v.evidence}
+                    known = {e.fact.fact_id for e in v.evidence}
                     for item in comp.inputs:
-                        if item.cell_id not in known:
+                        if item.fact_id not in known:
                             v.evidence.append(
-                                VerifiedEvidence(cell=cells[item.cell_id], quoted=item.cell_value)
+                                VerifiedEvidence(fact=facts[item.fact_id], quoted=item.value)
                             )
-                            known.add(item.cell_id)
+                            known.add(item.fact_id)
                     if "{result}" in answer:
                         answer = fill_result(answer, comp)
                     else:
@@ -287,13 +286,13 @@ class AskService:
 
         unsupported: list[str] = []
         if status in ("answered", "computed"):
-            auto_link(answer, v, cells)
-            link_row_numbers(answer, v, cells)
+            auto_link(answer, v, facts)
+            link_row_numbers(answer, v, facts)
             if not v.evidence:
                 status, confidence = "not_found", "low"
                 answer = (
-                    f"{NOT_FOUND_PREFIX} The model's answer could not be matched to any cell in "
-                    "the record, so it was withheld."
+                    f"{NOT_FOUND_PREFIX} The model's answer could not be matched to anything in "
+                    "the files, so it was withheld."
                 )
             else:
                 unsupported = check_numbers(
@@ -306,7 +305,7 @@ class AskService:
                 if unsupported:
                     confidence = "low"
                     warnings.append(
-                        "The answer mentions numbers that are not in the cited cells: "
+                        "The answer mentions numbers that are not in the cited sources: "
                         + ", ".join(unsupported)
                     )
         if status == "not_found" and not _says_not_found(answer):
@@ -318,7 +317,7 @@ class AskService:
             conversation_id=ctx.conversation_id,
             status=status,  # type: ignore[arg-type]
             answer=answer,
-            evidence=[_evidence_out(e.cell, e.quoted, e.auto_linked) for e in v.evidence],
+            evidence=[_evidence_out(e.fact, e.quoted, e.auto_linked) for e in v.evidence],
             computation=_computation_out(draft, comp) if comp else None,
             general_knowledge=draft.general_knowledge,
             missing_information=draft.missing_information,
@@ -329,7 +328,7 @@ class AskService:
                 citations_verified=sum(1 for e in v.evidence if not e.auto_linked),
                 auto_linked=sum(1 for e in v.evidence if e.auto_linked),
                 dropped=[
-                    DroppedOut(cell_id=d.cell_id, quoted=d.quoted, reason=d.reason)
+                    DroppedOut(fact_id=d.fact_id, quoted=d.quoted, reason=d.reason)
                     for d in v.dropped
                 ],
                 unsupported_numbers=unsupported,
@@ -423,19 +422,26 @@ def _says_not_found(text: str) -> bool:
     return any(p in t for p in ("can't find", "cannot find", "not in the provided", "not found in"))
 
 
-def _evidence_out(cell: CellRef, quoted: str, auto_linked: bool) -> EvidenceOut:
+def _evidence_out(fact: Fact, quoted: str, auto_linked: bool) -> EvidenceOut:
     return EvidenceOut(
-        cell_id=cell.cell_id,
-        file=cell.file,
-        sheet=cell.sheet,
-        cell=f"{cell.col}{cell.row}",
-        row=cell.row,
-        header=cell.header,
-        canonical=cell.canonical,
-        value=cell.value,
+        fact_id=fact.fact_id,
+        source=fact.source,
+        file=fact.file,
+        locator=fact.locator,
+        header=fact.label,
+        canonical=fact.canonical,
+        value=fact.value,
         quoted=quoted,
-        hidden=cell.hidden,
+        hidden=fact.hidden,
+        stale=fact.stale,
+        confidence=fact.confidence,
         auto_linked=auto_linked,
+        sheet=fact.sheet,
+        cell=fact.coordinate,
+        row=fact.row,
+        page=fact.page,
+        region=fact.region,
+        bbox=fact.bbox,
     )
 
 
@@ -449,9 +455,7 @@ def _computation_out(draft: AnswerDraft, comp: ComputeResult) -> ComputationOut:
         display=comp.display,
         unit=comp.unit,
         inputs=[
-            ComputationInputOut(
-                name=i.name, cell_id=i.cell_id, cell_value=i.cell_value, number=i.number
-            )
+            ComputationInputOut(name=i.name, fact_id=i.fact_id, value=i.value, number=i.number)
             for i in comp.inputs
         ],
         constants=comp.constants,

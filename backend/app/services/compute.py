@@ -14,13 +14,13 @@ import re
 from dataclasses import dataclass, field
 from functools import lru_cache
 
-from app.domain.record import CellRef
+from app.domain.evidence import Fact
 from app.llm.schemas import Computation
 
 MAX_EXPRESSION_CHARS = 300
 # A number not glued to a letter or digit on its left:
-# "Ø125" -> 125, "SS304" -> none, "M10" -> none.
-_NUMBER_RE = re.compile(r"(?<![A-Za-z0-9.])[-+]?\d+(?:\.\d+)?")
+# "Ø125" -> 125, "SS304" -> none, "M10" -> none. Inch drawings write ".010" for 0.010.
+_NUMBER_RE = re.compile(r"(?<![A-Za-z0-9.])[-+]?(?:\d+(?:\.\d+)?|\.\d+)")
 _UNIT_NAMES = {
     "mm": "millimeter",
     "cm": "centimeter",
@@ -63,8 +63,8 @@ class ComputeError(ValueError):
 @dataclass(slots=True)
 class ComputedInput:
     name: str
-    cell_id: str
-    cell_value: str
+    fact_id: str
+    value: str
     number: float
 
 
@@ -141,7 +141,7 @@ def _eval(node: ast.AST, names: dict[str, float], constants: list[float]) -> flo
     raise ComputeError(f"disallowed expression element: {type(node).__name__}")
 
 
-def compute(computation: Computation, cells: dict[str, CellRef]) -> ComputeResult:
+def compute(computation: Computation, facts: dict[str, Fact]) -> ComputeResult:
     expr = computation.expression.strip()
     if not expr or len(expr) > MAX_EXPRESSION_CHARS:
         raise ComputeError("expression is empty or too long")
@@ -153,17 +153,17 @@ def compute(computation: Computation, cells: dict[str, CellRef]) -> ComputeResul
     for item in computation.inputs:
         if not re.fullmatch(r"[a-z]\w{0,15}", item.name):
             raise ComputeError(f"invalid input name '{item.name}'")
-        cell = cells.get(item.cell_id)
-        if cell is None:
-            raise ComputeError(f"input {item.name} cites unknown cell {item.cell_id}")
-        numbers = extract_numbers(cell.value)
+        fact = facts.get(item.fact_id)
+        if fact is None:
+            raise ComputeError(f"input {item.name} cites unknown fact {item.fact_id}")
+        numbers = extract_numbers(fact.value)
         if not 0 <= item.number_index < len(numbers):
             raise ComputeError(
-                f"cell {item.cell_id} ('{cell.value}') has no number at index {item.number_index}"
+                f"fact {item.fact_id} ('{fact.value}') has no number at index {item.number_index}"
             )
         names[item.name] = numbers[item.number_index]
         inputs.append(
-            ComputedInput(item.name, item.cell_id, cell.value, numbers[item.number_index])
+            ComputedInput(item.name, item.fact_id, fact.value, numbers[item.number_index])
         )
 
     try:

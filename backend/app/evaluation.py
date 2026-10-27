@@ -49,6 +49,11 @@ def load_golden(path: Path = GOLDEN) -> list[dict]:
     ]
 
 
+def _fact_id(evidence: dict) -> str:
+    """Evidence ids are ``fact_id`` since Level 2; saved Level 1 results used ``cell_id``."""
+    return evidence.get("fact_id") or evidence["cell_id"]
+
+
 def score_row(row: dict, result: dict, latency_ms: int) -> RowResult:
     status = result.get("status", "error")
     answer = result.get("answer", "")
@@ -80,23 +85,29 @@ def score_row(row: dict, result: dict, latency_ms: int) -> RowResult:
             notes.append(f"forbidden '{s}' present")
 
     evidence = result.get("evidence", [])
-    cited = [e["cell_id"] for e in evidence]
+    cited = [_fact_id(e) for e in evidence]
     recall = precision = None
-    if row.get("cells"):
-        expected = set(row["cells"])
+    expected_ids = row.get("facts") or row.get("cells")
+    if expected_ids:
+        expected = set(expected_ids)
         # Precision counts a citation as justified when the golden set lists it, when it identifies
         # the part the answer names (part number / description), or when the verifier linked it
         # because the answer quotes that cell's value verbatim. Anything else lowers precision.
         justified = {
-            e["cell_id"]
+            _fact_id(e)
             for e in evidence
             if e.get("auto_linked") or e.get("canonical") in ("part_number", "description")
         }
-        acceptable = expected | set(row.get("acceptable_cells", [])) | justified
+        acceptable = (
+            expected
+            | set(row.get("acceptable_facts", []))
+            | set(row.get("acceptable_cells", []))
+            | justified
+        )
         recall = len(expected & set(cited)) / len(expected)
         precision = (len([c for c in cited if c in acceptable]) / len(cited)) if cited else 0.0
         if recall < 1:
-            notes.append(f"missed cells {sorted(expected - set(cited))}")
+            notes.append(f"missed facts {sorted(expected - set(cited))}")
     passed = status_ok and content_ok is not False and (recall is None or recall == 1.0)
     return RowResult(
         id=row["id"],

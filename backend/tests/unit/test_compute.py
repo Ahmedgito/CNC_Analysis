@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import pytest
 
+from app.domain.evidence import Fact
 from app.domain.record import CellRef
 from app.llm.schemas import Computation, ComputationInput
 from app.services.compute import ComputeError, compute, convert, extract_numbers
 
 
-def _cell(cid: str, value: str, unit: str | None = None) -> CellRef:
+def _cell(cid: str, value: str, unit: str | None = None) -> Fact:
     return CellRef(
         cell_id=cid,
         file="f.xlsx",
@@ -18,7 +19,7 @@ def _cell(cid: str, value: str, unit: str | None = None) -> CellRef:
         value=value,
         value_type="text",
         unit=unit,
-    )
+    ).to_fact(group="g")
 
 
 CELLS = {
@@ -34,7 +35,7 @@ CELLS = {
 def _comp(expr: str, *inputs: tuple[str, str, int], unit_in=None, unit_out=None) -> Computation:
     return Computation(
         expression=expr,
-        inputs=[ComputationInput(name=n, cell_id=c, number_index=i) for n, c, i in inputs],
+        inputs=[ComputationInput(name=n, fact_id=c, number_index=i) for n, c, i in inputs],
         unit_in=unit_in,
         unit_out=unit_out,
         label="x",
@@ -122,7 +123,7 @@ def test_rejects_unsafe_expressions(expr):
 
 
 def test_rejects_unknown_cell_and_missing_number():
-    with pytest.raises(ComputeError, match="unknown cell"):
+    with pytest.raises(ComputeError, match="unknown fact"):
         compute(_comp("c1", ("c1", "f!S!Z99", 0)), CELLS)
     with pytest.raises(ComputeError, match="no number"):
         compute(_comp("c1", ("c1", "f!S!C2", 0)), CELLS)

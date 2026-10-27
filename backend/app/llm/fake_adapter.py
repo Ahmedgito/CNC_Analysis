@@ -102,7 +102,7 @@ def _draft(status: str, answer: str, **kw) -> AnswerDraft:
 
 
 def _ev(cells: list[_Cell]) -> list[EvidenceItem]:
-    return [EvidenceItem(cell_id=c.cell_id, quoted_value=c.value) for c in cells]
+    return [EvidenceItem(fact_id=c.cell_id, quoted_value=c.value) for c in cells]
 
 
 def rules_answer(user: str) -> AnswerDraft:
@@ -150,7 +150,7 @@ def rules_answer(user: str) -> AnswerDraft:
         rows = by_canon.get(canon, [])
         if rows:
             inputs = [
-                ComputationInput(name=f"c{i + 1}", cell_id=c.cell_id, number_index=0)
+                ComputationInput(name=f"c{i + 1}", fact_id=c.cell_id, number_index=0)
                 for i, c in enumerate(rows)
             ]
             return _draft(
@@ -174,7 +174,7 @@ def rules_answer(user: str) -> AnswerDraft:
             evidence=_ev([stock]),
             computation=Computation(
                 expression="c1",
-                inputs=[ComputationInput(name="c1", cell_id=stock.cell_id, number_index=0)],
+                inputs=[ComputationInput(name="c1", fact_id=stock.cell_id, number_index=0)],
                 unit_in=stock.unit or "mm",
                 unit_out="in",
                 label="stock size in inches",

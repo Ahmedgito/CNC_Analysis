@@ -20,7 +20,7 @@ TOKEN = "sk-ant-oat01-test-token"
 DRAFT = {
     "status": "answered",
     "answer": "SS304",
-    "evidence": [{"cell_id": "mfg_record_A!Parts!C2", "quoted_value": "SS304"}],
+    "evidence": [{"fact_id": "mfg_record_A!Parts!C2", "quoted_value": "SS304"}],
     "computation": None,
     "general_knowledge": [],
     "missing_information": [],
@@ -59,7 +59,7 @@ def test_token_never_on_argv_and_env_is_an_allowlist(monkeypatch, tmp_path):
 
 def test_parses_structured_output_and_usage():
     draft, usage = parse_envelope(_envelope(), "", 0, "m")
-    assert draft.status == "answered" and draft.evidence[0].cell_id == "mfg_record_A!Parts!C2"
+    assert draft.status == "answered" and draft.evidence[0].fact_id == "mfg_record_A!Parts!C2"
     assert usage.input_tokens == 150 and usage.cached_tokens == 50 and usage.output_tokens == 20
 
 
