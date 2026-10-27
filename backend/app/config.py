@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     data_dir: Path = Path(__file__).resolve().parent.parent.parent / "data"
     auto_ingest: bool = False  # ingest DATA_DIR on startup (used by docker compose)
     max_upload_mb: int = 25
+    # Original drawing bytes and rendered page images (content-addressed, safe to delete).
+    store_dir: Path = Path(__file__).resolve().parent.parent / "var" / "store"
+    pdf_max_pages: int = 20
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
 
     # LLM

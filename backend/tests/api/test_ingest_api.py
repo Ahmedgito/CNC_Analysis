@@ -58,7 +58,21 @@ def test_changed_file_supersedes_previous_version(ingested_client):
 
 
 def test_unsupported_upload(client):
-    files = [("files", ("drawing.pdf", b"%PDF-1.7", "application/pdf"))]
+    files = [("files", ("model.dwg", b"AC1032 binary", "application/octet-stream"))]
     resp = client.post("/api/v1/ingest", files=files)
     assert resp.status_code == 415
     assert resp.json()["title"] == "Unsupported file"
+
+
+def test_truncated_pdf_is_refused_with_a_reason_not_a_crash(client):
+    files = [("files", ("drawing.pdf", b"%PDF-1.7", "application/pdf"))]
+    resp = client.post("/api/v1/ingest", files=files)
+    assert resp.status_code == 422
+    assert resp.json()["title"] == "Unreadable document"
+    assert "not a readable PDF" in resp.json()["detail"]
+
+
+def test_pdf_named_file_that_is_not_a_pdf_is_unsupported(client):
+    files = [("files", ("drawing.pdf", b"just text, not a pdf", "application/pdf"))]
+    resp = client.post("/api/v1/ingest", files=files)
+    assert resp.status_code == 415

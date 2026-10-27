@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.config import Settings
+from app.services.file_store import FileStore
 
 
 def get_settings_dep(request: Request) -> Settings:
@@ -29,8 +30,13 @@ def get_session(request: Request) -> Iterator[Session]:
         session.close()
 
 
+def get_store(request: Request) -> FileStore:
+    return request.app.state.store
+
+
 SessionDep = Annotated[Session, Depends(get_session)]
 SettingsDep = Annotated[Settings, Depends(get_settings_dep)]
+StoreDep = Annotated[FileStore, Depends(get_store)]
 
 
 class ProblemError(Exception):

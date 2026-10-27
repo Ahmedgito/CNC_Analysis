@@ -32,3 +32,6 @@ test-results/
 .DS_Store
 Thumbs.db
 ~$*.xlsx
+
+# content-addressed drawing store (uploaded PDFs, rendered pages)
+backend/var/

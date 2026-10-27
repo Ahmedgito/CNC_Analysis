@@ -64,8 +64,8 @@ def _truncate(db_url: str) -> None:
     with engine.begin() as conn:
         conn.execute(
             text(
-                "TRUNCATE llm_call, message, conversation, part, part_fragment, cell, ingest_run "
-                "RESTART IDENTITY CASCADE"
+                "TRUNCATE llm_call, message, conversation, part, part_fragment, cell, "
+                "drawing_fact, ingest_run RESTART IDENTITY CASCADE"
             )
         )
     engine.dispose()
@@ -78,6 +78,7 @@ def make_test_settings(db_url: str, data_dir: Path, **overrides):
         "app_env": "test",
         "database_url": db_url,
         "data_dir": data_dir,
+        "store_dir": data_dir / ".store",
         "auto_ingest": False,
         "llm_primary_provider": "fake",
         "llm_fallback_provider": "none",

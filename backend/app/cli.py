@@ -22,17 +22,39 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
         return 2
     engine = make_engine(settings.database_url)
     try:
-        outcomes = ingest_paths(make_session_factory(engine), path)
+        from app.services.file_store import FileStore
+
+        outcomes = ingest_paths(
+            make_session_factory(engine),
+            path,
+            FileStore(settings.store_dir),
+            settings.pdf_max_pages,
+        )
     finally:
         engine.dispose()
     if not outcomes:
-        print(f"No .xlsx/.xls/.csv files found under {path}")
+        print(f"No .xlsx/.xls/.csv/.pdf files found under {path}")
         return 1
     for o in outcomes:
         print(f"{o.status:<10} {o.file_name:<32} parts={','.join(o.parts) or '-'}")
         for w in o.warnings:
             print(f"           ! {w}")
     return 1 if any(o.status == "failed" for o in outcomes) else 0
+
+
+def _cmd_rebuild(_: argparse.Namespace) -> int:
+    from app.db.session import make_engine, make_session_factory, session_scope
+    from app.repositories.parts import rebuild_all
+
+    settings = get_settings()
+    engine = make_engine(settings.database_url)
+    try:
+        with session_scope(make_session_factory(engine)) as session:
+            count = rebuild_all(session)
+    finally:
+        engine.dispose()
+    print(f"Rebuilt {count} part records from stored fragments")
+    return 0
 
 
 def _cmd_serve(args: argparse.Namespace) -> int:
@@ -62,9 +84,16 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="cnc", description="SPEC'26 CNC part analyzer")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    p_ingest = sub.add_parser("ingest", help="Ingest a spreadsheet or a directory of them")
+    p_ingest = sub.add_parser(
+        "ingest", help="Ingest a spreadsheet or PDF drawing, or a directory of them"
+    )
     p_ingest.add_argument("path", nargs="?", help="File or directory (default: DATA_DIR)")
     p_ingest.set_defaults(func=_cmd_ingest)
+
+    p_rebuild = sub.add_parser(
+        "rebuild", help="Regroup stored fragments into part records (after an upgrade)"
+    )
+    p_rebuild.set_defaults(func=_cmd_rebuild)
 
     p_serve = sub.add_parser("serve", help="Run the API server")
     p_serve.add_argument("--host", default="127.0.0.1")
