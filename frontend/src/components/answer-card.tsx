@@ -21,9 +21,9 @@ import {
   ShieldCheck,
   XCircle,
 } from "lucide-react";
-import { motion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
-import { useState } from "react";
+import { useId, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import type { AnswerStatus, AskAction, AskResult, Evidence } from "@/lib/api/schemas";
 import { cn } from "@/lib/cn";
@@ -207,6 +207,31 @@ export function EvidenceChip({
   );
 }
 
+/** Chips shown before "See all". */
+export const SOURCE_PREVIEW = 4;
+
+/**
+ * The first few sources, keeping at least one per source kind (spreadsheet, drawing) so a
+ * collapsed answer still shows every file it drew on.
+ */
+export function previewSources(evidence: Evidence[], n = SOURCE_PREVIEW): Evidence[] {
+  if (evidence.length <= n) return evidence;
+  const preview = evidence.slice(0, n);
+  for (const kind of ["excel", "pdf"] as const) {
+    const first = evidence.find((e) => e.source === kind);
+    if (!first || preview.some((e) => e.source === kind)) continue;
+    // Replace the last chip of the kind that has the most chips in the preview.
+    const counts = preview.reduce<Record<string, number>>(
+      (m, e) => ({ ...m, [e.source]: (m[e.source] ?? 0) + 1 }),
+      {},
+    );
+    const crowded = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0];
+    const at = preview.findLastIndex((e) => e.source === crowded);
+    if (at >= 0) preview[at] = first;
+  }
+  return evidence.filter((e) => preview.includes(e)); // keep the answer's citation order
+}
+
 const markdown = {
   p: (props: React.ComponentProps<"p">) => <p className="leading-relaxed" {...props} />,
   ul: (props: React.ComponentProps<"ul">) => (
@@ -244,6 +269,21 @@ export function AnswerCard({
   const p = result.provider;
   const [showFields, setShowFields] = useState(false);
   const [approved, setApproved] = useState<string | null>(null);
+  const [showAllSources, setShowAllSources] = useState(false);
+  const sourcesId = useId();
+  const preview = previewSources(result.evidence);
+  // A highlighted fact hidden behind "See all" (e.g. picked from the cross-check list) opens it.
+  const selectedHidden =
+    selectedFactId != null &&
+    result.evidence.some((e) => e.fact_id === selectedFactId) &&
+    !preview.some((e) => e.fact_id === selectedFactId);
+  const sourcesOpen = showAllSources || selectedHidden;
+  const shownSources = sourcesOpen ? result.evidence : preview;
+  const hiddenCount = result.evidence.length - preview.length;
+  const sourceKinds = {
+    excel: result.evidence.filter((e) => e.source === "excel").length,
+    pdf: result.evidence.filter((e) => e.source === "pdf").length,
+  };
   const verified = v && v.citations_checked + v.auto_linked > 0;
 
   return (
@@ -293,21 +333,51 @@ export function AnswerCard({
 
       {result.evidence.length ? (
         <motion.div variants={reveal} className="flex flex-col gap-1.5">
-          <p className="text-[11px] font-medium tracking-[0.15em] text-zinc-500 uppercase">Sources</p>
-          <motion.div
-            className="flex flex-wrap gap-1.5"
-            variants={{ show: { transition: { staggerChildren: 0.05 } } }}
-          >
-            {result.evidence.map((e) => (
-              <motion.span
-                key={e.fact_id}
-                variants={{ hidden: { opacity: 0, scale: 0.9 }, show: { opacity: 1, scale: 1 } }}
-                className="max-w-full"
-              >
-                <EvidenceChip evidence={e} active={selectedFactId === e.fact_id} onSelect={onSelectFact} />
-              </motion.span>
-            ))}
+          <p className="flex flex-wrap items-baseline gap-x-2 text-[11px] font-medium tracking-[0.15em] text-zinc-500 uppercase">
+            Sources
+            <span className="font-mono tracking-normal text-zinc-400 normal-case">
+              {result.evidence.length}
+              {sourceKinds.excel && sourceKinds.pdf
+                ? ` · ${sourceKinds.excel} spreadsheet, ${sourceKinds.pdf} drawing`
+                : ""}
+            </span>
+          </p>
+          <motion.div layout className="flex flex-wrap gap-1.5" id={sourcesId}>
+            <AnimatePresence initial={true} mode="popLayout">
+              {shownSources.map((e, i) => (
+                <motion.span
+                  key={e.fact_id}
+                  layout
+                  initial={{ opacity: 0, scale: 0.9, y: 4 }}
+                  animate={{ opacity: 1, scale: 1, y: 0, transition: { delay: Math.min(i, 12) * 0.03 } }}
+                  exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.12 } }}
+                  className="max-w-full"
+                >
+                  <EvidenceChip evidence={e} active={selectedFactId === e.fact_id} onSelect={onSelectFact} />
+                </motion.span>
+              ))}
+            </AnimatePresence>
           </motion.div>
+          {hiddenCount > 0 && !selectedHidden ? (
+            <button
+              type="button"
+              aria-expanded={sourcesOpen}
+              aria-controls={sourcesId}
+              onClick={() => setShowAllSources((v) => !v)}
+              className="group inline-flex w-fit items-center gap-1 rounded-lg px-1.5 py-0.5 text-xs font-medium text-cyan-700 transition-colors hover:bg-cyan-50 focus-visible:ring-2 focus-visible:ring-cyan-500/60 focus-visible:outline-none dark:text-cyan-300 dark:hover:bg-cyan-400/10"
+            >
+              {sourcesOpen ? "Show fewer" : `See all ${result.evidence.length} sources`}
+              {sourcesOpen ? null : (
+                <span className="rounded-full bg-cyan-100 px-1.5 font-mono text-[10px] text-cyan-800 dark:bg-cyan-400/15 dark:text-cyan-200">
+                  +{hiddenCount}
+                </span>
+              )}
+              <ChevronDown
+                className={cn("size-3.5 transition-transform duration-200", sourcesOpen && "rotate-180")}
+                aria-hidden
+              />
+            </button>
+          ) : null}
         </motion.div>
       ) : null}
 

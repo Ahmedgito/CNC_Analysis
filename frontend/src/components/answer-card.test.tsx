@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { AskResult, Evidence } from "@/lib/api/schemas";
-import { AnswerCard } from "./answer-card";
+import { AnswerCard, previewSources } from "./answer-card";
 
 vi.mock("next/link", () => ({
   default: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => (
@@ -89,6 +89,42 @@ describe("AnswerCard", () => {
     expect(chip).toHaveTextContent("Ø48");
     await userEvent.click(chip);
     expect(onSelect).toHaveBeenCalledWith("2283_bushing!p1!dim!2");
+  });
+
+  it("shows a few sources and a See all button for the rest", async () => {
+    const many = Array.from({ length: 7 }, (_, i) => ({
+      ...evidence,
+      fact_id: `mfg_record_A!Parts!C${i + 2}`,
+      locator: `Parts › C${i + 2}`,
+      cell: `C${i + 2}`,
+    }));
+    render(<AnswerCard result={{ ...base, evidence: many }} />);
+    expect(screen.getAllByRole("button", { name: /mfg_record_A\.xlsx › Parts/ })).toHaveLength(4);
+    const toggle = screen.getByRole("button", { name: /See all 7 sources/ });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await userEvent.click(toggle);
+    expect(await screen.findAllByRole("button", { name: /mfg_record_A\.xlsx › Parts/ })).toHaveLength(7);
+    await userEvent.click(screen.getByRole("button", { name: /Show fewer/ }));
+    expect(screen.getByRole("button", { name: /See all 7 sources/ })).toBeInTheDocument();
+  });
+
+  it("does not offer See all when every source fits", () => {
+    render(<AnswerCard result={{ ...base, evidence: [evidence, drawingEvidence] }} />);
+    expect(screen.queryByRole("button", { name: /See all/ })).not.toBeInTheDocument();
+  });
+
+  it("keeps a drawing source in the preview when the spreadsheet cites more", () => {
+    const cells = Array.from({ length: 5 }, (_, i) => ({ ...evidence, fact_id: `x!Parts!C${i}` }));
+    const preview = previewSources([...cells, drawingEvidence]);
+    expect(preview).toHaveLength(4);
+    expect(preview.map((e) => e.source)).toContain("pdf");
+    expect(preview.at(-1)?.fact_id).toBe(drawingEvidence.fact_id); // answer order kept
+  });
+
+  it("opens the full list when the highlighted source is one of the hidden ones", () => {
+    const many = Array.from({ length: 6 }, (_, i) => ({ ...evidence, fact_id: `x!Parts!C${i}` }));
+    render(<AnswerCard result={{ ...base, evidence: many }} selectedFactId="x!Parts!C5" />);
+    expect(screen.getAllByRole("button", { name: /mfg_record_A\.xlsx/ })).toHaveLength(6);
   });
 
   it("labels values read from a scan by the vision model", () => {
