@@ -345,13 +345,23 @@ def get_part(part_number: str):
                 "file_stem": p["part_key"],
                 "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
                 "page_count": 1,
-                "pages": [1],
-                "title_block": {
-                    "part_number": p["display_part_number"],
-                    "revision": "A",
-                    "material": p["material"],
-                    "units": "mm"
-                },
+                "pages": [
+                    {
+                        "page": 1,
+                        "width": 842,
+                        "height": 595,
+                        "rotation": 0,
+                        "correction": 0,
+                        "role": "drawing",
+                        "units": "mm"
+                    }
+                ],
+                "part_number": p["display_part_number"],
+                "part_number_source": "title_block",
+                "title": p["description"],
+                "current_revision": "A",
+                "units": "mm",
+                "readable": True,
                 "scanned": False,
                 "extraction": "text",
                 "facts": [],
@@ -382,26 +392,32 @@ def get_part(part_number: str):
             {
                 "field": "outer_diameter",
                 "label": "Outer Diameter (OD)",
-                "verdict": "conflict" if p["part_key"] == "2283" else "match",
+                "verdict": "disagree" if p["part_key"] == "2283" else "agree",
                 "excel": [f"{p['part_key']}!r2!D"],
                 "pdf": [],
                 "iges": [],
                 "excel_value": "50.0 mm" if p["part_key"] == "2283" else "Nominal",
                 "pdf_value": "48.0 mm" if p["part_key"] == "2283" else "Nominal",
                 "iges_value": "48.0 mm" if p["part_key"] == "2283" else "Nominal",
-                "sides": []
+                "sides": [],
+                "pairs": {},
+                "dissent": [f"{p['part_key']}!r2!D"] if p["part_key"] == "2283" else [],
+                "detail": "MISMATCH: Excel claims 50.0mm while CAD & Drawing specify 48.0mm" if p["part_key"] == "2283" else "All sources agree on outer diameter"
             },
             {
                 "field": "material",
                 "label": "Raw Material Grade",
-                "verdict": "conflict" if p["part_key"] == "2283" else "match",
+                "verdict": "disagree" if p["part_key"] == "2283" else "agree",
                 "excel": [f"{p['part_key']}!r2!C"],
                 "pdf": [],
                 "iges": [],
                 "excel_value": "C36000 Brass" if p["part_key"] == "2283" else p["material"],
                 "pdf_value": "Bronze C93200" if p["part_key"] == "2283" else p["material"],
                 "iges_value": "Bronze C93200" if p["part_key"] == "2283" else p["material"],
-                "sides": []
+                "sides": [],
+                "pairs": {},
+                "dissent": [f"{p['part_key']}!r2!C"] if p["part_key"] == "2283" else [],
+                "detail": "CONFLICT: Excel claims C36000 Brass while CAD & Drawing specify Bronze C93200" if p["part_key"] == "2283" else "Material specification matches across all records"
             }
         ],
         "aliases": [p["display_part_number"], p["part_key"]]
@@ -461,3 +477,4 @@ async def ask_part(part_number: str, request: Request):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="127.0.0.1", port=8000)
+
