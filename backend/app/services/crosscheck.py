@@ -1,4 +1,4 @@
-"""Spreadsheet-vs-drawing cross-check. Deterministic, no LLM.
+"""Spreadsheet-vs-drawing cross-check (the model joins in ``crosscheck_model``). Deterministic.
 
 For each field both sources can state (material, outer diameter, bore, length, thickness, holes,
 thread, tolerance, surface finish) the current spreadsheet values are compared with the current
@@ -695,18 +695,24 @@ def _finish_check(record: PartRecord, drawings: list[DrawingSlice]) -> CrossChec
 
 
 def cross_check(record: PartRecord) -> list[CrossCheck]:
+    """Every comparable field across the spreadsheet, the readable drawings and the 3D model."""
+    from app.services.crosscheck_model import three_way
+
     drawings = [d for d in record.drawings if d.readable]
-    if not drawings or not record.sheets:
+    two_way: list[CrossCheck] = []
+    if drawings and record.sheets:
+        checks: list[CrossCheck | None] = [
+            _material_check(record, drawings),
+            *_size_checks(record, drawings),
+            _holes_check(record, drawings),
+            _thread_check(record, drawings),
+            _tolerance_check(record, drawings),
+            _finish_check(record, drawings),
+        ]
+        two_way = [c for c in checks if c is not None]
+    if not two_way and not record.models:
         return []
-    checks: list[CrossCheck | None] = [
-        _material_check(record, drawings),
-        *_size_checks(record, drawings),
-        _holes_check(record, drawings),
-        _thread_check(record, drawings),
-        _tolerance_check(record, drawings),
-        _finish_check(record, drawings),
-    ]
-    return [c for c in checks if c is not None]
+    return three_way(record, drawings, two_way)
 
 
 # --------------------------------------------------------- spreadsheet-internal conflicts
