@@ -116,6 +116,35 @@ PARTS = [
         "Quenched and tempered",
         15,
     ],
+    [
+        "9007",
+        "MG996 Servo Bracket",
+        "Aluminum 6061-T6",
+        "65 x 45 x 30 (extruded block)",
+        "57.2 x 39.1 x 26.0 envelope",
+        "8 x \u00d84.2 mounting holes, 2 x \u00d82.0 locator holes",
+        "Haas Mini Mill",
+        16,
+        "\u00b10.1 mm",
+        "Ra 1.6",
+        "Black Anodized",
+        100,
+    ],
+    [
+        "9008",
+        "Pivot Support Clevis Bracket",
+        "AISI 1045 steel",
+        "165 x 50 x 135 forging blank",
+        "156.3 x 40.0 x 123.9 envelope; 40 mm clevis fork width",
+        # PLANTED MISMATCH: Excel claims 2 x D20 fork pivot holes; 3D model (STEP/IGES) has 2 x D27 holes
+        "2 x \u00d820 pivot holes; 1 x \u00d816 mount hole; 1 x \u00d812.5 hole",
+        "Haas VF-3 mill",
+        34,
+        "\u00b10.05 mm",
+        "Ra 1.6 (Ra 0.8 pivot bore)",
+        "Induction harden pivot bore (50-54 HRC)",
+        40,
+    ],
 ]
 
 OPS_HEADER = ["Part No", "Op No", "Operation", "Machine", "Tool", "Setup (min)", "Run (min)"]
@@ -142,6 +171,12 @@ OPERATIONS = [
     ["9005", 30, "Bore \u00d845 bearing journal and \u00d875 recess", "Haas VF-4", "Precision boring head", 8, 10],
     ["9006", 10, "Rough and finish turn \u00d896, \u00d824, \u00d816 steps", "Mazak QT-350", "CNMG 120408 / VNMG 160404", 10, 12],
     ["9006", 20, "Grind bearing journals to Ra 0.8", "Studer cylindrical grinder", "Al2O3 grinding wheel", 8, 7],
+    ["9007", 10, "Mill perimeter profile and servo pocket", "Haas Mini Mill", "\u00d86 carbide end mill", 6, 6],
+    ["9007", 20, "Drill 8 x \u00d84.2 and 2 x \u00d82.0 holes", "Haas Mini Mill", "\u00d84.2 drill, \u00d82.0 drill", 4, 3],
+    ["9008", 10, "Face mill top, bottom and fork cheeks", "Haas VF-3", "\u00d863 face mill", 10, 8],
+    ["9008", 20, "Mill central clevis slot width 40 mm", "Haas VF-3", "\u00d825 roughing end mill", 8, 12],
+    ["9008", 30, "Drill and bore 2 x \u00d820 pivot holes", "Haas VF-3", "\u00d820 drill and boring head", 6, 8],
+    ["9008", 40, "Drill \u00d816 mounting hole and \u00d812.5 hole", "Haas VF-3", "\u00d816 drill, \u00d812.5 drill", 5, 4],
 ]
 
 

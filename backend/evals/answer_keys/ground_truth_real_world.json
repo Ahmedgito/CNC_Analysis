@@ -172,5 +172,57 @@
       "cycle time": "25 min (Excel)",
       "unit price": "Not found in the provided files"
     }
+  },
+  "9007": {
+    "name": "MG996 Servo Bracket",
+    "source": "GrabCAD 'Servo bracket of mg996'",
+    "files": {
+      "excel": "docs/real_world/real_world_records.xlsx",
+      "iges": "docs/real_world/9007_mg996_servo_bracket/Servo_Bracket_MG996.igs",
+      "step": "docs/real_world/9007_mg996_servo_bracket/Servo_Bracket_MG996.STEP",
+      "pdf": "NOT AVAILABLE"
+    },
+    "geometry_truth": {
+      "units": "mm",
+      "bodies": 2,
+      "bbox_mm": [57.2, 39.1, 26.0],
+      "holes": "8 x D4.2 mounting holes, 2 x D2.0 locator holes",
+      "volume_mm3": 12006
+    },
+    "planted_issue": "none; clean happy path for miniature RC servo bracket. Drawing NOT AVAILABLE.",
+    "expected_answers": {
+      "material": "Aluminum 6061-T6 (Excel)",
+      "envelope": "57.2 x 39.1 x 26.0 mm (Excel and IGES agree)",
+      "mounting holes": "8 x D4.2 (Excel and IGES agree)",
+      "cycle time": "16 min (Excel)",
+      "unit price": "Not found in the provided files"
+    }
+  },
+  "9008": {
+    "name": "Pivot Support Clevis Bracket",
+    "source": "GrabCAD 'Pivot support bracket fork clevis bracket'",
+    "files": {
+      "excel": "docs/real_world/real_world_records.xlsx",
+      "iges": "docs/real_world/9008_pivot_support_bracket/Pivot Support.iges (native GrabCAD IGES)",
+      "step": "docs/real_world/9008_pivot_support_bracket/Pivot Support.STEP",
+      "pdf": "docs/real_world/9008_pivot_support_bracket/Pivot Support.pdf (SolidWorks drawing with raster view)"
+    },
+    "geometry_truth": {
+      "units": "mm",
+      "bodies": 1,
+      "bbox_mm": [156.3, 40.0, 123.9],
+      "fork_pivot_holes": "2 x D27 holes",
+      "mounting_holes": "1 x D16 hole, 1 x D12.5 hole",
+      "volume_mm3": 227512
+    },
+    "planted_issue": "MISMATCH: Excel claims 2 x D20 fork pivot holes; 3D model (STEP/IGES) has 2 x D27 holes. MUST be flagged.",
+    "expected_answers": {
+      "material": "AISI 1045 steel (Excel)",
+      "fork pivot hole diameter": "Flag disagreement: Excel claims 20 mm, but 3D model (STEP/IGES) has 27 mm holes (2 x D27)",
+      "clevis fork width": "40 mm (Excel and IGES agree)",
+      "envelope": "156.3 x 40.0 x 123.9 mm (Excel and IGES agree)",
+      "cycle time": "34 min (Excel)",
+      "unit price": "Not found in the provided files"
+    }
   }
 }
