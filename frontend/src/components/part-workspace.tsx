@@ -13,6 +13,7 @@ import { CompareView } from "./compare-view";
 import { RecordViewer } from "./record-viewer";
 import { SourceBadges } from "./source-badges";
 import { AnimatedTabs } from "./ui/animated-tabs";
+import { ReportButton } from "./workspace/report-button";
 
 type View = "record" | "ask";
 
@@ -25,6 +26,7 @@ export function PartWorkspace({ partNumber }: { partNumber: string }) {
   const [selectedFactId, setSelectedFactId] = useState<string | null>(null);
   const [view, setView] = useState<View>("ask");
   const [compare, setCompare] = useState(false);
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const { data, error, isPending } = useQuery({
     queryKey: ["part", partNumber],
     queryFn: () => getPart(partNumber),
@@ -162,6 +164,7 @@ export function PartWorkspace({ partNumber }: { partNumber: string }) {
                 <Columns2 className="size-3.5" aria-hidden /> Compare
               </button>
             ) : null}
+            <ReportButton partNumber={record.part_key} conversationId={conversationId} />
             <SourceBadges sources={record.sources} />
           </div>
         </motion.div>
@@ -207,6 +210,7 @@ export function PartWorkspace({ partNumber }: { partNumber: string }) {
             partNumber={record.part_key}
             selectedFactId={selectedFactId}
             onSelectFact={selectFact}
+            onConversationChange={setConversationId}
             className={cn("h-[76dvh] lg:h-auto", view === "ask" ? "flex" : "hidden lg:flex")}
           />
         </motion.div>

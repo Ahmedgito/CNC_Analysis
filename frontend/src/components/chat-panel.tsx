@@ -42,17 +42,25 @@ export function ChatPanel({
   partNumber,
   selectedFactId,
   onSelectFact,
+  onConversationChange,
   className,
 }: {
   partNumber: string;
   selectedFactId?: string | null;
   /** `auto` is true when the app highlights the first source itself, not on a user click. */
   onSelectFact?: (factId: string, opts?: { auto?: boolean }) => void;
+  /** The server conversation this thread belongs to, so the part report can include it. */
+  onConversationChange?: (conversationId: string | null) => void;
   className?: string;
 }) {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState("");
-  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [conversationId, setConversationIdState] = useState<string | null>(null);
+
+  function setConversationId(id: string | null) {
+    setConversationIdState(id);
+    onConversationChange?.(id);
+  }
   const [busy, setBusy] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);

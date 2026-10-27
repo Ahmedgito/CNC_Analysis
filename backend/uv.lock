@@ -283,6 +283,7 @@ dependencies = [
     { name = "pypdfium2" },
     { name = "python-multipart" },
     { name = "rapidfuzz" },
+    { name = "reportlab" },
     { name = "sqlalchemy", extra = ["asyncio"] },
     { name = "sse-starlette" },
     { name = "structlog" },
@@ -296,7 +297,6 @@ dev = [
     { name = "pyright" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
-    { name = "reportlab" },
     { name = "ruff" },
 ]
 
@@ -318,6 +318,7 @@ requires-dist = [
     { name = "pypdfium2", specifier = ">=5.14.0" },
     { name = "python-multipart", specifier = ">=0.0.32" },
     { name = "rapidfuzz", specifier = ">=3.14.6" },
+    { name = "reportlab", specifier = ">=5.1.0" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.1.6" },
     { name = "sse-starlette", specifier = ">=3.6.0" },
     { name = "structlog", specifier = ">=26.1.0" },
@@ -331,7 +332,6 @@ dev = [
     { name = "pyright", specifier = ">=1.1.414" },
     { name = "pytest", specifier = ">=9.1.1" },
     { name = "pytest-asyncio", specifier = ">=1.4.1" },
-    { name = "reportlab", specifier = ">=5.1.0" },
     { name = "ruff", specifier = ">=0.17.2" },
 ]
 

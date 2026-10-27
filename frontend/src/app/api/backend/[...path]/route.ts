@@ -12,6 +12,7 @@ const FORWARD_RESPONSE = [
   "x-request-id",
   "cache-control",
   "etag",
+  "content-disposition",
   "content-security-policy",
   "x-content-type-options",
 ];

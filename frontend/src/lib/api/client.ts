@@ -73,6 +73,28 @@ export function modelViewUrl(partNumber: string, file: string, view: string, ver
   return `${modelBase(partNumber, file)}/views/${encodeURIComponent(view)}.svg?v=${version}`;
 }
 
+/**
+ * The part report as a PDF file: summary, sources, cross-check, record, drawings, models and,
+ * with a conversation id, the questions asked with their verified sources.
+ */
+export async function downloadReport(partNumber: string, conversationId?: string | null) {
+  const query = conversationId ? `?conversation=${encodeURIComponent(conversationId)}` : "";
+  const resp = await fetch(`${API_BASE}/parts/${encodeURIComponent(partNumber)}/report.pdf${query}`, {
+    cache: "no-store",
+  });
+  if (!resp.ok) throw await failure(resp);
+  const name =
+    /filename="([^"]+)"/.exec(resp.headers.get("content-disposition") ?? "")?.[1] ??
+    `part-${partNumber}-report.pdf`;
+  const url = URL.createObjectURL(await resp.blob());
+  const link = Object.assign(document.createElement("a"), { href: url, download: name });
+  document.body.append(link);
+  link.click();
+  link.remove();
+  // Revoke after the click has been handled, or some browsers cancel the download.
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 export type AskOptions = {
   conversationId?: string | null;
   signal?: AbortSignal;
