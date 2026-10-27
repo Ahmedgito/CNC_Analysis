@@ -35,6 +35,18 @@ LEVEL2 = {
     "stale_excel",
     "identity",
 }
+# Golden-set categories that need the IGES models (Level 3).
+LEVEL3 = {
+    "model_lookup",
+    "three_agree",
+    "three_unit",
+    "three_disagree",
+    "convention",
+    "stock",
+    "scan_plus_model",
+    "missing_model",
+    "model_limits",
+}
 
 
 @dataclass(slots=True)
@@ -170,6 +182,7 @@ def summarise(rows: list[RowResult]) -> dict:
     llm_rows = [r for r in rows if r.status not in ("part_not_found", "invalid_question")]
     recalls = [r.recall for r in with_cells if r.recall is not None]
     level2 = [r for r in rows if r.category in LEVEL2]
+    level3 = [r for r in rows if r.category in LEVEL3 or r.id.startswith("M")]
     named = [r for r in rows if r.names_file is not None]
     precisions = [r.precision for r in with_cells if r.precision is not None]
     return {
@@ -187,6 +200,8 @@ def summarise(rows: list[RowResult]) -> dict:
         "citation_precision": statistics.mean(precisions) if precisions else None,
         "level2_rows": len(level2),
         "level2_passed": sum(r.passed for r in level2),
+        "level3_rows": len(level3),
+        "level3_passed": sum(r.passed for r in level3),
         "answers_with_sources": len(named),
         "answers_naming_file": sum(bool(r.names_file) for r in named),
         "latency_ms_median": statistics.median(r.latency_ms for r in llm_rows)
@@ -216,6 +231,7 @@ def render_markdown(provider: str, model: str, summary: dict, rows: list[RowResu
         f"| Answered incorrectly (wrong content, or answered when it should abstain) | {s['answered_incorrectly']} |",
         f"| Citation recall / precision (answered rows)¹ | {_pct(s['citation_recall'])} / {_pct(s['citation_precision'])} |",
         f"| Level 2 questions (drawings, cross-checks, scans) passed | {s.get('level2_passed', 0)} / {s.get('level2_rows', 0)} |",
+        f"| Level 3 questions (3D models, three-way checks) passed | {s.get('level3_passed', 0)} / {s.get('level3_rows', 0)} |",
         f"| Answers whose text names the file they came from | {s.get('answers_naming_file', 0)} / {s.get('answers_with_sources', 0)} |",
         "| Citations that failed verification but were shown | 0 (verifier guarantees) |",
         f"| Median latency | {s['latency_ms_median'] or 0:.0f} ms |",

@@ -70,8 +70,9 @@ _FIELD_KEYWORDS: list[tuple[tuple[str, ...], str]] = [
     (("stock", "raw", "blank", "billet", "bar size"), "raw_stock"),
     # Before the diameters: "hole diameter" asks about the holes, not the part.
     (("hole", "drilled"), "holes"),
-    (("outer diameter", "outside diameter", "od", "diameter"), "outer_diameter"),
+    # Before the diameters too: "bore diameter" asks about the bore.
     (("bore",), "bore"),
+    (("outer diameter", "outside diameter", "od", "diameter"), "outer_diameter"),
     (("thickness", "thick"), "thickness"),
     (("finished size", "final dim", "dimension", "overall size", "size"), "finished_size"),
     (("machine", "work center", "work centre", "lathe", "mill"), "machine"),
