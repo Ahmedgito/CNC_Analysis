@@ -90,5 +90,87 @@
       "operations": "4 ops (Excel)",
       "unit price / delivery date": "Not found in the provided files"
     }
+  },
+  "9004": {
+    "name": "Helical Bevel Gear",
+    "source": "GrabCAD 'How to model a helical bevel gear in solidworks'",
+    "files": {
+      "excel": "docs/real_world/real_world_records.xlsx",
+      "iges": "docs/real_world/9004_helical_bevel_gear/Helical Bevel Gear.igs",
+      "step": "docs/real_world/9004_helical_bevel_gear/Helical Bevel Gear.STEP",
+      "pdf": "NOT AVAILABLE"
+    },
+    "geometry_truth": {
+      "units": "mm",
+      "bodies": 1,
+      "bbox_mm": [295.0, 170.0, 170.0],
+      "centre_bore_mm": 25.0,
+      "pin_holes": "2 x D20 radial holes",
+      "volume_mm3": 1519303
+    },
+    "planted_issue": "none; clean CAD geometry with hobbed bevel teeth. Drawing NOT AVAILABLE (must say unavailable, not guess).",
+    "expected_answers": {
+      "material": "20MnCr5 alloy steel (Excel)",
+      "centre bore": "25 mm (Excel and IGES agree)",
+      "overall size": "295 x 170 x 170 mm (Excel and IGES agree)",
+      "cycle time": "48 min (Excel)",
+      "drawing": "Drawing NOT AVAILABLE",
+      "unit price": "Not found in the provided files"
+    }
+  },
+  "9005": {
+    "name": "Bearing Bracket Flanged Pivot Mount",
+    "source": "GrabCAD 'Bearing Bracket Flanged Pivot Mount'",
+    "files": {
+      "excel": "docs/real_world/real_world_records.xlsx",
+      "iges": "docs/real_world/9005_bearing_bracket/Bearing-Bracket.igs",
+      "step": "docs/real_world/9005_bearing_bracket/Bearing-Bracket.STEP",
+      "drawing_dwg": "docs/real_world/9005_bearing_bracket/Bearing-Bracket.dwg"
+    },
+    "geometry_truth": {
+      "units": "mm",
+      "bodies": 1,
+      "bbox_mm": [192.0, 258.5, 229.5],
+      "bearing_bore_mm": 45.0,
+      "recess_bore_mm": 75.0,
+      "flange_holes": "4 x D25 through holes",
+      "alignment_holes": "2 x D10 holes",
+      "volume_mm3": 2231605
+    },
+    "planted_issue": "MISMATCH: Excel claims 4 x D20 flange holes; 3D model (STEP/IGES) has 4 x D25 holes. MUST be flagged.",
+    "expected_answers": {
+      "material": "Ductile Iron EN-GJS-400-15 (Excel)",
+      "bearing bore": "45 mm (Excel and IGES agree)",
+      "flange hole diameter": "Flag disagreement: Excel states 20 mm, but IGES model has 25 mm holes (4 x D25)",
+      "envelope": "192 x 258.5 x 229.5 mm (Excel and IGES agree)",
+      "cycle time": "38 min (Excel)",
+      "unit price": "Not found in the provided files"
+    }
+  },
+  "9006": {
+    "name": "Wind Turbine Main Shaft",
+    "source": "GrabCAD 'Wind turbine rotor hub pmsg housing assembly'",
+    "files": {
+      "excel": "docs/real_world/real_world_records.xlsx",
+      "iges": "docs/real_world/9006_wind_turbine_components/Main_Shaft.igs",
+      "step": "docs/real_world/9006_wind_turbine_components/Main_Shaft.STEP"
+    },
+    "geometry_truth": {
+      "units": "mm",
+      "bodies": 1,
+      "bbox_mm": [190.0, 96.0, 96.0],
+      "step_diameters_mm": [96.0, 24.0, 16.0],
+      "length_mm": 190.0,
+      "volume_mm3": 962789
+    },
+    "planted_issue": "none; textbook turned stepped shaft. Excel and IGES agree on step diameters (D96, D24, D16) and overall length 190 mm.",
+    "expected_answers": {
+      "material": "42CrMo4 alloy steel (Excel)",
+      "shaft length": "190 mm (Excel and IGES agree)",
+      "step diameters": "D96, D24, D16 mm (Excel and IGES agree)",
+      "machine": "Mazak QT-350 CNC lathe (Excel)",
+      "cycle time": "25 min (Excel)",
+      "unit price": "Not found in the provided files"
+    }
   }
 }
