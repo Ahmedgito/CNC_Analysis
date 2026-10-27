@@ -1,0 +1,35 @@
+{
+  "_note": "Answer key for REAL-WORLD validation parts (docs/real_world/). Do not feed to the app. Geometry measured from the original STEP with tools/inspect_cad.py. Excel = docs/real_world/real_world_records.xlsx.",
+  "9001": {
+    "name": "S-Shaped Flanged Pipe Connector",
+    "source": "GrabCAD 'S-Shaped Flanged Pipe Connector' (Mehdi Jalali), SolidWorks export",
+    "files": {
+      "excel": "docs/real_world/real_world_records.xlsx (Parts + Operations)",
+      "iges": "docs/real_world/9001_s_pipe_connector/Part1.igs (converted from Part1.STEP)",
+      "step": "docs/real_world/9001_s_pipe_connector/Part1.STEP",
+      "pdf": "NOT AVAILABLE (only Part1.SLDDRW, unreadable without SolidWorks; referenced .SLDPRT missing)"
+    },
+    "geometry_truth": {
+      "units": "mm",
+      "bodies": 2,
+      "bbox_mm": [435.0, 235.0, 140.0],
+      "flange_od_mm": 140.0,
+      "bore_mm": 80.0,
+      "bolt_holes": "12 x D15 (6 per flange) on D120 PCD, 60 deg spacing",
+      "volume_mm3": 1343343
+    },
+    "planted_issue": "MISMATCH: Excel Holes column and Ops 40/50 say 8 x D15 (4 per flange); IGES has 12 x D15 (6 per flange). MUST be flagged. Flange OD, bore, PCD and envelope all AGREE and must NOT be flagged.",
+    "expected_answers": {
+      "material": "ASTM A216 WCB cast steel (Excel)",
+      "how many bolt holes": "Flag disagreement: Excel 8 vs IGES 12; cite both",
+      "hole diameter": "D15 (Excel and IGES agree)",
+      "flange OD / bore": "D140 / D80 (Excel and IGES agree)",
+      "overall size": "435 x 235 x 140 mm (Excel and IGES agree)",
+      "cycle time": "55 min (Excel)",
+      "operations": "5 ops: face A, face B, bore, drill A, drill B (Excel)",
+      "drawing / title block / drawing number": "Drawing NOT AVAILABLE",
+      "weight": "Not in Excel. If computed: 1,343,343 mm3 x 7.85 g/cm3 ~ 10.5 kg, must be labelled as derived from IGES volume + assumed density",
+      "unit price / customer / delivery date": "Not found in the provided files"
+    }
+  }
+}
