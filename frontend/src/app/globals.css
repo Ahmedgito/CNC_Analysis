@@ -1,0 +1,11 @@
+@import "tailwindcss";
+
+/* The theme is a class on <html> (set before paint by the layout script), so `dark:` follows the
+   in-app toggle as well as the OS setting. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Design tokens only. All styling lives in Tailwind utility classes in components. */
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
