@@ -1,0 +1,18 @@
+# Normalize real text files
+*.py    text eol=lf
+*.md    text eol=lf
+*.txt   text eol=lf
+*.json  text eol=lf
+
+# Binary engineering / data files - never touch line endings
+*.pdf   binary
+*.xlsx  binary
+*.xls   binary
+*.zip   binary
+*.igs   binary
+*.iges  binary
+*.step  binary
+*.stp   binary
+*.png   binary
+*.jpg   binary
+
