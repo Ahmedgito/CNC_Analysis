@@ -1,0 +1,1237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FOUNDRY // Deterministic CNC Intelligence Pitch Deck</title>
+  
+  <!-- Premium Modern Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  
+  <!-- Robust Standard CDNs -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+
+  <style>
+    :root {
+      --bg: #07090e;
+      --card-bg: rgba(14, 20, 32, 0.78);
+      --card-border: rgba(255, 255, 255, 0.09);
+      --card-hover-border: rgba(0, 240, 255, 0.35);
+      --cyan: #00f0ff;
+      --cyan-glow: rgba(0, 240, 255, 0.25);
+      --blue: #3b82f6;
+      --emerald: #10b981;
+      --amber: #f59e0b;
+      --danger: #ff3366;
+      --text-white: #ffffff;
+      --text-light: #f1f5f9;
+      --text-body: #cbd5e1;
+      --text-muted: #8492a6;
+      --font-main: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text-white);
+      font-family: var(--font-main);
+      height: 100vh;
+      width: 100vw;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+    }
+
+    /* Subtle Technical Blueprint Background Grid */
+    .bg-grid {
+      position: fixed;
+      inset: 0;
+      background-image: 
+        linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+      background-size: 50px 50px;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* Ambient Spotlight Illumination */
+    .ambient-glow {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 1;
+      background: 
+        radial-gradient(circle at 18% 25%, rgba(59, 130, 246, 0.12) 0%, transparent 45%),
+        radial-gradient(circle at 82% 55%, rgba(0, 240, 255, 0.09) 0%, transparent 40%);
+    }
+
+    /* Laser Pointer Dot */
+    #laser-pointer {
+      position: fixed;
+      width: 12px;
+      height: 12px;
+      background: #ff1155;
+      border-radius: 50%;
+      box-shadow: 0 0 14px 4px #ff1155, 0 0 24px 8px rgba(255, 17, 85, 0.6);
+      pointer-events: none;
+      z-index: 9999;
+      display: none;
+      transform: translate(-50%, -50%);
+      transition: width 0.1s, height 0.1s;
+    }
+
+    /* 3D Mechanical Canvas on the Right Half (Completely Unobscured) */
+    #canvas-container {
+      position: fixed;
+      right: 0;
+      top: 0;
+      width: 50vw;
+      height: 100vh;
+      z-index: 2;
+      pointer-events: auto;
+      cursor: grab;
+    }
+
+    #canvas-container:active {
+      cursor: grabbing;
+    }
+
+    /* 3D Canvas Minimal Viewport Controls */
+    .cad-viewport-tools {
+      position: fixed;
+      right: 40px;
+      bottom: 84px;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(11, 17, 28, 0.85);
+      border: 1px solid var(--card-border);
+      backdrop-filter: blur(12px);
+      padding: 6px 12px;
+      border-radius: 8px;
+    }
+
+    .tool-pill {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      background: transparent;
+      border: 1px solid transparent;
+      padding: 4px 10px;
+      border-radius: 5px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+
+    .tool-pill:hover, .tool-pill.active {
+      color: var(--cyan);
+      background: rgba(0, 240, 255, 0.1);
+      border-color: rgba(0, 240, 255, 0.3);
+    }
+
+    /* Header Bar */
+    header.deck-header {
+      padding: 22px 52px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 20;
+    }
+
+    .brand-logo {
+      font-size: 1.25rem;
+      font-weight: 900;
+      letter-spacing: -0.5px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+    }
+
+    .brand-badge {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      color: var(--cyan);
+      background: rgba(0, 240, 255, 0.1);
+      border: 1px solid rgba(0, 240, 255, 0.3);
+      padding: 3px 8px;
+      border-radius: 4px;
+    }
+
+    .header-pills {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .timer-pill {
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--card-border);
+      padding: 6px 14px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .timer-pill strong {
+      color: #ffffff;
+      font-weight: 700;
+    }
+
+    .nav-btn {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--card-border);
+      color: #ffffff;
+      padding: 8px 18px;
+      border-radius: 6px;
+      font-size: 0.84rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+      text-decoration: none;
+    }
+
+    .nav-btn:hover {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+
+    .nav-btn.primary {
+      background: var(--blue);
+      border-color: #60a5fa;
+      box-shadow: 0 4px 14px rgba(59, 130, 246, 0.3);
+    }
+
+    .nav-btn.primary:hover {
+      background: #2563eb;
+    }
+
+    .nav-btn.active-glow {
+      background: rgba(255, 17, 85, 0.15);
+      border-color: #ff1155;
+      color: #ff708f;
+    }
+
+    /* Presentation Slide Stage (Left Half) */
+    main.deck-stage {
+      flex: 1;
+      padding: 0 52px;
+      display: flex;
+      align-items: center;
+      z-index: 10;
+      max-width: 1440px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .slide {
+      display: none;
+      width: 100%;
+      max-width: 740px;
+    }
+
+    .slide.active {
+      display: block;
+    }
+
+    /* Slide Typography */
+    .slide-tag {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--cyan);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .slide-tag .tag-indicator {
+      width: 6px;
+      height: 6px;
+      background: var(--cyan);
+      border-radius: 50%;
+      box-shadow: 0 0 10px var(--cyan);
+    }
+
+    .slide-headline {
+      font-size: 3.5rem;
+      font-weight: 900;
+      line-height: 1.08;
+      letter-spacing: -1.8px;
+      color: var(--text-white);
+      margin-bottom: 22px;
+    }
+
+    .slide-headline span.accent {
+      color: var(--cyan);
+      text-shadow: 0 0 35px var(--cyan-glow);
+    }
+
+    .slide-headline span.danger {
+      color: var(--danger);
+      text-shadow: 0 0 35px rgba(255, 51, 102, 0.35);
+    }
+
+    .slide-body {
+      font-size: 1.22rem;
+      line-height: 1.62;
+      color: var(--text-body);
+      font-weight: 400;
+      margin-bottom: 30px;
+    }
+
+    /* Quick Metrics Row on Title Slide */
+    .hero-stat-row {
+      display: flex;
+      gap: 32px;
+      margin-top: 36px;
+      padding-top: 24px;
+      border-top: 1px solid var(--card-border);
+    }
+
+    .hero-stat-item {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .hero-stat-item .stat-num {
+      font-family: var(--font-mono);
+      font-size: 2.2rem;
+      font-weight: 800;
+      color: #ffffff;
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+
+    .hero-stat-item .stat-num span {
+      color: var(--cyan);
+    }
+
+    .hero-stat-item .stat-label {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* Clean Architectural Cards */
+    .card-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+      margin-top: 14px;
+    }
+
+    .simple-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 22px 24px;
+      backdrop-filter: blur(14px);
+      transition: all 0.25s ease;
+    }
+
+    .simple-card:hover {
+      border-color: var(--card-hover-border);
+      background: rgba(18, 26, 42, 0.88);
+      transform: translateY(-2px);
+    }
+
+    .simple-card.span-2 {
+      grid-column: span 2;
+    }
+
+    .simple-card h3 {
+      font-size: 1.12rem;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .simple-card p {
+      font-size: 0.94rem;
+      color: var(--text-muted);
+      line-height: 1.55;
+    }
+
+    /* 3-Step Pipeline Flow Strip */
+    .pipeline-strip {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+    }
+
+    .pipe-node {
+      padding: 8px 14px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      color: #e2e8f0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .pipe-node.highlight {
+      background: rgba(0, 240, 255, 0.12);
+      border-color: var(--cyan);
+      color: var(--cyan);
+      font-weight: 700;
+    }
+
+    .pipe-arrow {
+      color: var(--text-muted);
+      font-weight: 700;
+    }
+
+    /* The "Magic Moment" Discrepancy Box */
+    .proof-box {
+      background: rgba(15, 23, 40, 0.92);
+      border: 1px solid rgba(255, 51, 102, 0.4);
+      border-radius: 12px;
+      padding: 26px 30px;
+      box-shadow: 0 15px 40px rgba(0, 0, 0, 0.6), 0 0 25px rgba(255, 51, 102, 0.1);
+    }
+
+    .proof-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .proof-title {
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .proof-badge {
+      font-family: var(--font-mono);
+      font-size: 0.74rem;
+      padding: 4px 12px;
+      border-radius: 4px;
+      font-weight: 800;
+      background: rgba(255, 51, 102, 0.18);
+      border: 1px solid var(--danger);
+      color: #ff99b0;
+      letter-spacing: 0.5px;
+    }
+
+    .diff-row {
+      display: flex;
+      align-items: baseline;
+      gap: 16px;
+      margin-bottom: 14px;
+      font-size: 1.05rem;
+    }
+
+    .diff-row .diff-label {
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      min-width: 150px;
+      letter-spacing: 0.5px;
+    }
+
+    .diff-row .diff-val {
+      font-weight: 600;
+      color: #ffffff;
+    }
+
+    .diff-row .diff-val.red {
+      color: #ff6b8b;
+    }
+
+    .diff-row .diff-val.green {
+      color: #34d399;
+    }
+
+    /* Supported Formats Chips (Slide 5) */
+    .format-pills {
+      display: flex;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .format-pill {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      padding: 3px 9px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: var(--cyan);
+      font-weight: 600;
+    }
+
+    /* Speaker Script Cheat Sheet Drawer */
+    .script-drawer {
+      position: fixed;
+      bottom: 84px;
+      left: 52px;
+      max-width: 680px;
+      background: rgba(11, 18, 32, 0.96);
+      border: 1px solid var(--blue);
+      border-radius: 10px;
+      padding: 18px 24px;
+      z-index: 50;
+      font-size: 0.95rem;
+      line-height: 1.55;
+      color: #bfdbfe;
+      display: none;
+      box-shadow: 0 15px 45px rgba(0, 0, 0, 0.85);
+    }
+
+    .script-drawer.show {
+      display: block;
+    }
+
+    .script-drawer strong {
+      color: #ffffff;
+      display: block;
+      margin-bottom: 6px;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      font-family: var(--font-mono);
+      letter-spacing: 1px;
+    }
+
+    /* Footer Navigation Dock */
+    footer.deck-footer {
+      padding: 22px 52px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 20;
+    }
+
+    /* Slide Navigation Jump Dots */
+    .slide-jump-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .jump-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      padding: 4px 10px;
+      border-radius: 6px;
+      transition: all 0.2s ease;
+    }
+
+    .jump-item:hover {
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .jump-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.2);
+      transition: all 0.25s ease;
+    }
+
+    .jump-label {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      transition: all 0.25s ease;
+    }
+
+    .jump-item.active .jump-dot {
+      background: var(--cyan);
+      box-shadow: 0 0 10px var(--cyan);
+      transform: scale(1.3);
+    }
+
+    .jump-item.active .jump-label {
+      color: #ffffff;
+      font-weight: 700;
+    }
+
+    .deck-nav-btns {
+      display: flex;
+      gap: 12px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Background Technical Blueprint Grid -->
+  <div class="bg-grid"></div>
+
+  <!-- Ambient Spotlight Glow -->
+  <div class="ambient-glow"></div>
+
+  <!-- Interactive Laser Pointer -->
+  <div id="laser-pointer"></div>
+
+  <!-- 3D Mechanical Canvas (Right Half - 100% Unobscured) -->
+  <div id="canvas-container">
+    <canvas id="three-canvas"></canvas>
+  </div>
+
+  <!-- 3D Viewport Controls Pill (Bottom Right) -->
+  <div class="cad-viewport-tools">
+    <button class="tool-pill" id="tool-wireframe" onclick="toggleWireframe()">
+      <i class="fa-solid fa-border-none"></i> Wireframe
+    </button>
+    <button class="tool-pill active" id="tool-rotate" onclick="toggleAutoRotate()">
+      <i class="fa-solid fa-arrows-rotate"></i> Auto-Spin
+    </button>
+    <button class="tool-pill" id="tool-reset" onclick="reset3DCamera()">
+      <i class="fa-solid fa-crosshairs"></i> Reset
+    </button>
+  </div>
+
+  <!-- Header -->
+  <header class="deck-header">
+    <div class="brand-logo" onclick="goToSlide(0)">
+      <span>CNC-SENTINEL</span>
+      <span class="brand-badge">SUPARCO SPEC'26</span>
+    </div>
+
+    <div class="header-pills">
+      <div class="timer-pill">
+        <i class="fa-regular fa-clock" style="color: var(--cyan);"></i>
+        <span>ELAPSED:</span>
+        <strong id="deck-timer">00:00</strong>
+      </div>
+
+      <button class="nav-btn" id="laser-btn" onclick="toggleLaser()" title="Shortcut: Press 'L'">
+        <i class="fa-solid fa-bullseye"></i> <span>Laser Pointer (L)</span>
+      </button>
+
+      <button class="nav-btn" id="notes-btn" onclick="toggleNotes()" title="Shortcut: Press 'P'">
+        <i class="fa-solid fa-microphone"></i> <span id="notes-btn-text">Speaker Script (P)</span>
+      </button>
+
+      <button class="nav-btn" onclick="toggleFullScreen()" title="Shortcut: Press 'F'">
+        <i class="fa-solid fa-expand"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- Presenter Script Drawer (Cheat Sheet) -->
+  <div class="script-drawer" id="script-drawer">
+    <strong><i class="fa-solid fa-comment-dots" style="color: var(--blue);"></i> What to say to judges:</strong>
+    <span id="speaker-script-text"></span>
+  </div>
+
+  <!-- Main Slide Arena -->
+  <main class="deck-stage">
+
+    <!-- SLIDE 1: The Core Pitch -->
+    <div class="slide active" id="slide-0" data-part="flange" data-script="Good morning judges. In software engineering, when code breaks, you press Undo. But in precision aerospace manufacturing, a 50-micron mismatch on a satellite bracket doesn't throw a software 404 error. It scraps a forty-thousand-dollar titanium part, shatters a high-speed spindle, and halts a space launch. Today, we bring deterministic intelligence to heavy metal.">
+      <div class="slide-tag">
+        <div class="tag-indicator"></div>
+        The Core Problem
+      </div>
+      <h1 class="slide-headline">Physical hardware has <br><span class="accent">no Undo button.</span></h1>
+      <p class="slide-body">
+        Software solved version control with Git twenty years ago. Advanced aerospace CNC manufacturing is still trapped across disconnected spreadsheets, paper drawings, and 3D CAD files.
+      </p>
+      
+      <div style="display: flex; gap: 14px; align-items: center;">
+        <button class="nav-btn primary" onclick="nextSlide()">
+          See The Crisis <i class="fa-solid fa-arrow-right"></i>
+        </button>
+      </div>
+
+      <div class="hero-stat-row">
+        <div class="hero-stat-item">
+          <div class="stat-num"><span>0.4</span>s</div>
+          <div class="stat-label">Discrepancy Catch Time</div>
+        </div>
+        <div class="hero-stat-item">
+          <div class="stat-num"><span>100</span>%</div>
+          <div class="stat-label">Deterministic Citation Lock</div>
+        </div>
+        <div class="hero-stat-item">
+          <div class="stat-num"><span>8</span>+</div>
+          <div class="stat-label">Real GrabCAD Assemblies</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 2: The Three Data Islands -->
+    <div class="slide" id="slide-1" data-part="flange" data-script="Every CNC component relies on three separate sources: an Excel job card on the shopfloor, a 2D PDF drawing on the engineer's desk, and a 3D CAD model on a server. Humans spend days cross-referencing them. When they disagree, catastrophe happens.">
+      <div class="slide-tag">
+        <div class="tag-indicator" style="background: var(--danger); box-shadow: 0 0 10px var(--danger);"></div>
+        The Root Cause
+      </div>
+      <h2 class="slide-headline">Three files. <br><span class="danger">Zero alignment.</span></h2>
+      <p class="slide-body">
+        To machine a single precision satellite component, an engineer must manually cross-check three conflicting sources:
+      </p>
+      <div class="card-row">
+        <div class="simple-card">
+          <h3><i class="fa-solid fa-file-excel" style="color: #34d399;"></i> Excel Work Orders</h3>
+          <p>Machine assignments, tooling, stock size, and cycle times. Plagued by banner rows, merged cells, and stale revision codes.</p>
+        </div>
+        <div class="simple-card">
+          <h3><i class="fa-solid fa-cube" style="color: var(--cyan);"></i> 3D CAD & PDF Blueprints</h3>
+          <p>Tolerances, hole diameters, and true B-Rep geometry. Trapped in vector drawings and mathematical solids.</p>
+        </div>
+        <div class="simple-card span-2" style="background: rgba(255, 51, 102, 0.08); border-color: rgba(255, 51, 102, 0.25);">
+          <h3 style="color: #ff99b0;"><i class="fa-solid fa-triangle-exclamation"></i> The Human Fatigue Trap</h3>
+          <p>When engineering updates Rev A (bore Ø18mm) to Rev B (bore Ø20mm) on Sheet 2, the machinist still cuts Rev A from the stale Excel card. Thousands in scrap metal.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 3: The Solution -->
+    <div class="slide" id="slide-2" data-part="flange" data-script="Our solution is simple: Input one part number. Our engine autonomously ingests the Excel sheet without pre-set schemas, extracts true 3D B-Rep geometry using OpenCascade, reads the PDF drawing, and verifies every dimension with mathematical certainty.">
+      <div class="slide-tag">
+        <div class="tag-indicator"></div>
+        Tri-Source Intelligence
+      </div>
+      <h2 class="slide-headline">One Part Number. <br><span class="accent">Instant Mathematical Truth.</span></h2>
+      
+      <div class="pipeline-strip">
+        <div class="pipe-node">Input: Part Number</div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-node highlight"><i class="fa-solid fa-bolt"></i> Triangulation Engine</div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-node"><i class="fa-solid fa-shield-check"></i> Verified Answer & Citations</div>
+      </div>
+
+      <div class="card-row">
+        <div class="simple-card">
+          <h3><i class="fa-solid fa-table-cells" style="color: var(--emerald);"></i> Schema-Agnostic Parsing</h3>
+          <p>Auto-detects dirty table layouts, banner rows, multi-sheet fragments, and metric/imperial unit conversions automatically.</p>
+        </div>
+        <div class="simple-card">
+          <h3><i class="fa-solid fa-draw-polygon" style="color: var(--blue);"></i> OpenCascade B-Rep Kernel</h3>
+          <p>Direct mathematical boundary evaluation: true cylindrical surfaces, hole pitch circle diameters (PCD), and bounding boxes.</p>
+        </div>
+        <div class="simple-card span-2">
+          <h3><i class="fa-solid fa-lock" style="color: var(--cyan);"></i> 100% Citation Lock (Zero Hallucination)</h3>
+          <p>Every claim is bound to an exact file, sheet, row, or surface ID. If evidence does not exist, the engine returns 'NOT FOUND IN EVIDENCE' instead of guessing.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 4: The Live Proof (The Flaw Caught) -->
+    <div class="slide" id="slide-3" data-part="bushing" data-script="Here is the live proof from our benchmark test: Part 2283. The shopfloor Excel sheet said make it from Brass at 50 millimeters. But the engineering drawing and 3D CAD model specified Bronze at 48 millimeters. If cut, this part would fail on orbit. Our system caught and quarantined it in 0.4 seconds.">
+      <div class="slide-tag" style="color: var(--danger);">
+        <div class="tag-indicator" style="background: var(--danger); box-shadow: 0 0 10px var(--danger);"></div>
+        The Competition Smoking Gun
+      </div>
+      <h2 class="slide-headline">Catching the <br><span class="danger">Silent Flaw in 0.4s.</span></h2>
+      
+      <div class="proof-box">
+        <div class="proof-header">
+          <div class="proof-title">
+            <i class="fa-solid fa-circle-exclamation" style="color: var(--danger);"></i>
+            <span>Part 2283: Aerospace Bushing</span>
+          </div>
+          <span class="proof-badge">FLAGGED MISMATCH</span>
+        </div>
+        <div class="diff-row">
+          <span class="diff-label">SHOP EXCEL:</span>
+          <span class="diff-val red">OD Ø50.0 mm · C36000 Brass (Job Card B, Row 5)</span>
+        </div>
+        <div class="diff-row">
+          <span class="diff-label">DRAWING & CAD:</span>
+          <span class="diff-val green">OD Ø48.0 mm · Phosphor Bronze C93200 (2283_bushing.pdf & .igs)</span>
+        </div>
+        <div class="diff-row" style="margin-top: 18px; padding-top: 14px; border-top: 1px solid rgba(255, 255, 255, 0.08);">
+          <span class="diff-label">AUTOMATED ACTION:</span>
+          <span class="diff-val" style="color: var(--cyan); font-weight: 700;">Quarantined with exact cell citations. Prevented machine crash & scrap hardware.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 5: Real-World Generalization -->
+    <div class="slide" id="slide-4" data-part="clevis" data-script="We didn't just stop at synthetic test data. We validated our engine against 8 real-world GrabCAD aerospace and mechanical assemblies—including multi-body assemblies, spiral bevel gears, and clevis brackets with planted flaws. 27 operations parsed with zero warnings.">
+      <div class="slide-tag">
+        <div class="tag-indicator"></div>
+        Beyond Benchmark Data
+      </div>
+      <h2 class="slide-headline">Battle-Tested on <br><span class="accent">Real GrabCAD Assemblies.</span></h2>
+      <p class="slide-body">
+        Engineered to handle messy, non-ideal real-world aerospace files:
+      </p>
+      <div class="card-row">
+        <div class="simple-card">
+          <h3>Part 9008: Clevis Bracket</h3>
+          <p>Native IGES B-Rep with planted hole mismatch (Excel claims Ø20mm vs CAD Ø27mm). Caught and quarantined.</p>
+          <div class="format-pills">
+            <span class="format-pill">.IGES</span>
+            <span class="format-pill">.STEP</span>
+            <span class="format-pill">.PDF</span>
+          </div>
+        </div>
+        <div class="simple-card">
+          <h3>Part 9004: Bevel Gear</h3>
+          <p>150-face hobbed spiral gear geometry. True mathematical boundary representation extraction.</p>
+          <div class="format-pills">
+            <span class="format-pill">.STEP</span>
+            <span class="format-pill">.XLSX</span>
+            <span class="format-pill">.DWG</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 6: The Close & Live Demo -->
+    <div class="slide" id="slide-5" data-part="flange" data-script="Judges, our FastAPI backend and Next.js interface are running live right now. Ready to test any part number you give us. Thank you.">
+      <div class="slide-tag">
+        <div class="tag-indicator"></div>
+        Production Ready
+      </div>
+      <h2 class="slide-headline">Ready for the Spindle. <br><span class="accent">Ready for Live Demo.</span></h2>
+      <p class="slide-body">
+        FastAPI backend + OpenCascade 3D kernel + Next.js frontend are running live on our local machine right now.
+      </p>
+      <div style="display: flex; gap: 16px; margin-top: 30px;">
+        <a class="nav-btn primary" href="http://localhost:3000" target="_blank" style="padding: 12px 26px; font-size: 0.95rem;">
+          <i class="fa-solid fa-play"></i> Open Live Application
+        </a>
+        <button class="nav-btn" onclick="goToSlide(0)" style="padding: 12px 22px;">
+          <i class="fa-solid fa-rotate-left"></i> Replay Pitch
+        </button>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Footer Navigation Dock -->
+  <footer class="deck-footer">
+    <div class="slide-jump-bar">
+      <div class="jump-item active" onclick="goToSlide(0)">
+        <div class="jump-dot"></div>
+        <span class="jump-label">01 Reality</span>
+      </div>
+      <div class="jump-item" onclick="goToSlide(1)">
+        <div class="jump-dot"></div>
+        <span class="jump-label">02 Crisis</span>
+      </div>
+      <div class="jump-item" onclick="goToSlide(2)">
+        <div class="jump-dot"></div>
+        <span class="jump-label">03 Solution</span>
+      </div>
+      <div class="jump-item" onclick="goToSlide(3)">
+        <div class="jump-dot"></div>
+        <span class="jump-label">04 Proof</span>
+      </div>
+      <div class="jump-item" onclick="goToSlide(4)">
+        <div class="jump-dot"></div>
+        <span class="jump-label">05 Validation</span>
+      </div>
+      <div class="jump-item" onclick="goToSlide(5)">
+        <div class="jump-dot"></div>
+        <span class="jump-label">06 Demo</span>
+      </div>
+    </div>
+
+    <div class="deck-nav-btns">
+      <button class="nav-btn" onclick="prevSlide()"><i class="fa-solid fa-chevron-left"></i> Back</button>
+      <button class="nav-btn primary" onclick="nextSlide()">Next <i class="fa-solid fa-chevron-right"></i></button>
+    </div>
+  </footer>
+
+  <!-- Script Engine -->
+  <script>
+    // ---------------------------------------------------------
+    // 1. Presentation Stopwatch
+    // ---------------------------------------------------------
+    let elapsedSeconds = 0;
+    setInterval(() => {
+      elapsedSeconds++;
+      const m = String(Math.floor(elapsedSeconds / 60)).padStart(2, '0');
+      const s = String(elapsedSeconds % 60).padStart(2, '0');
+      document.getElementById('deck-timer').textContent = `${m}:${s}`;
+    }, 1000);
+
+    // ---------------------------------------------------------
+    // 2. Deck Navigation & Jump Dots
+    // ---------------------------------------------------------
+    let currentIdx = 0;
+    const slides = document.querySelectorAll('.slide');
+    const totalSlides = slides.length;
+    const jumpItems = document.querySelectorAll('.jump-item');
+    const speakerTextEl = document.getElementById('speaker-script-text');
+
+    function updateSlide() {
+      slides.forEach((s, i) => {
+        if (i === currentIdx) {
+          s.classList.add('active');
+          gsap.fromTo(s, { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.35, ease: 'power2.out' });
+        } else {
+          s.classList.remove('active');
+        }
+      });
+
+      jumpItems.forEach((item, i) => {
+        if (i === currentIdx) item.classList.add('active');
+        else item.classList.remove('active');
+      });
+
+      const activeSlide = slides[currentIdx];
+      speakerTextEl.textContent = activeSlide.getAttribute('data-script') || '';
+
+      const partKey = activeSlide.getAttribute('data-part') || 'flange';
+      switch3DPart(partKey);
+    }
+
+    function nextSlide() {
+      if (currentIdx < totalSlides - 1) {
+        currentIdx++;
+        updateSlide();
+      }
+    }
+
+    function prevSlide() {
+      if (currentIdx > 0) {
+        currentIdx--;
+        updateSlide();
+      }
+    }
+
+    function goToSlide(i) {
+      currentIdx = i;
+      updateSlide();
+    }
+
+    // Keyboard Shortcuts
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'Enter') nextSlide();
+      if (e.key === 'ArrowLeft') prevSlide();
+      if (e.key === 'p' || e.key === 'P') toggleNotes();
+      if (e.key === 'l' || e.key === 'L') toggleLaser();
+      if (e.key === 'f' || e.key === 'F') toggleFullScreen();
+      if (e.key >= '1' && e.key <= '6') goToSlide(parseInt(e.key) - 1);
+    });
+
+    // Speaker Script Drawer
+    function toggleNotes() {
+      const drawer = document.getElementById('script-drawer');
+      const btn = document.getElementById('notes-btn');
+      drawer.classList.toggle('show');
+      btn.classList.toggle('active-glow');
+    }
+
+    // Laser Pointer Toggle
+    let laserActive = false;
+    const laserPointer = document.getElementById('laser-pointer');
+    const laserBtn = document.getElementById('laser-btn');
+
+    function toggleLaser() {
+      laserActive = !laserActive;
+      laserPointer.style.display = laserActive ? 'block' : 'none';
+      laserBtn.classList.toggle('active-glow');
+      document.body.style.cursor = laserActive ? 'crosshair' : 'default';
+    }
+
+    window.addEventListener('mousemove', (e) => {
+      if (laserActive) {
+        laserPointer.style.left = `${e.clientX}px`;
+        laserPointer.style.top = `${e.clientY}px`;
+      }
+    });
+
+    // Fullscreen Toggle
+    function toggleFullScreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        if (document.exitFullscreen) document.exitFullscreen();
+      }
+    }
+
+    // ---------------------------------------------------------
+    // 3. High-Fidelity 3D Viewport with Realistic Titanium & Lighting
+    // ---------------------------------------------------------
+    const container = document.getElementById('canvas-container');
+    const canvas = document.getElementById('three-canvas');
+    const scene = new THREE.Scene();
+
+    const camera = new THREE.PerspectiveCamera(42, container.clientWidth / container.clientHeight, 0.1, 1000);
+    camera.position.set(0, 1.5, 17);
+
+    const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.1;
+
+    // Aerospace Studio Lighting
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.1);
+    scene.add(ambientLight);
+
+    const mainLight = new THREE.DirectionalLight(0x00f0ff, 2.8);
+    mainLight.position.set(12, 18, 14);
+    scene.add(mainLight);
+
+    const fillLight = new THREE.DirectionalLight(0x3b82f6, 1.6);
+    fillLight.position.set(-14, -8, -6);
+    scene.add(fillLight);
+
+    const topLight = new THREE.DirectionalLight(0xffffff, 1.2);
+    topLight.position.set(0, 20, 0);
+    scene.add(topLight);
+
+    // Root Part Anchor
+    const partRoot = new THREE.Group();
+    scene.add(partRoot);
+
+    // Materials
+    let wireframeMode = false;
+
+    const titaniumMat = new THREE.MeshStandardMaterial({
+      color: 0x334458,
+      metalness: 0.88,
+      roughness: 0.22,
+      wireframe: false
+    });
+
+    const polishedMat = new THREE.MeshStandardMaterial({
+      color: 0x00f0ff,
+      metalness: 0.92,
+      roughness: 0.15,
+      emissive: 0x001d26,
+      wireframe: false
+    });
+
+    const brassMat = new THREE.MeshStandardMaterial({
+      color: 0xca8a04,
+      metalness: 0.85,
+      roughness: 0.28,
+      wireframe: false
+    });
+
+    const voidMat = new THREE.MeshBasicMaterial({ color: 0x07090e });
+
+    // 3D Model Generators
+    function createFlange() {
+      const g = new THREE.Group();
+      
+      // Main Base Disc
+      const disc = new THREE.Mesh(new THREE.CylinderGeometry(5.4, 5.4, 0.9, 64), titaniumMat);
+      g.add(disc);
+
+      // Raised Precision Boss
+      const hub = new THREE.Mesh(new THREE.CylinderGeometry(2.8, 2.8, 1.8, 64), polishedMat);
+      hub.position.y = 0.55;
+      g.add(hub);
+
+      // Central Bore Hole
+      const bore = new THREE.Mesh(new THREE.CylinderGeometry(1.65, 1.65, 3.4, 48), voidMat);
+      g.add(bore);
+
+      // 6 Bolt Holes PCD
+      for (let i = 0; i < 6; i++) {
+        const theta = (i / 6) * Math.PI * 2;
+        const h = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.38, 1.5, 24), voidMat);
+        h.position.set(Math.cos(theta) * 4.0, 0, Math.sin(theta) * 4.0);
+        g.add(h);
+      }
+
+      // Outer Decorative Chamfer Ring
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(5.38, 0.05, 16, 64), new THREE.MeshBasicMaterial({ color: 0x00f0ff }));
+      ring.rotation.x = Math.PI / 2;
+      g.add(ring);
+
+      return g;
+    }
+
+    function createBushing() {
+      const g = new THREE.Group();
+
+      // Precision Bushing Cylinder
+      const outer = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 2.6, 5.0, 48), brassMat);
+      g.add(outer);
+
+      // Inner Bore
+      const inner = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 5.2, 36), voidMat);
+      g.add(inner);
+
+      // Flange Rim
+      const rim = new THREE.Mesh(new THREE.CylinderGeometry(3.6, 3.6, 0.6, 48), brassMat);
+      rim.position.y = 2.2;
+      g.add(rim);
+
+      // PULSING RED RING - THE DETECTED FLAND/OD MISMATCH
+      const ringGeo = new THREE.TorusGeometry(2.68, 0.1, 16, 64);
+      const ringMat = new THREE.MeshBasicMaterial({ color: 0xff1155 });
+      const ring = new THREE.Mesh(ringGeo, ringMat);
+      ring.rotation.x = Math.PI / 2;
+      ring.name = 'mismatchRing';
+      g.add(ring);
+
+      return g;
+    }
+
+    function createClevis() {
+      const g = new THREE.Group();
+
+      // Base Block
+      const base = new THREE.Mesh(new THREE.BoxGeometry(7.2, 1.3, 4.6), titaniumMat);
+      g.add(base);
+
+      // Left Ear
+      const ear1 = new THREE.Mesh(new THREE.BoxGeometry(1.3, 4.0, 4.6), polishedMat);
+      ear1.position.set(-1.8, 2.3, 0);
+      g.add(ear1);
+
+      // Right Ear
+      const ear2 = new THREE.Mesh(new THREE.BoxGeometry(1.3, 4.0, 4.6), polishedMat);
+      ear2.position.set(1.8, 2.3, 0);
+      g.add(ear2);
+
+      // Through-Hole Cylinder (Void)
+      const pinHole = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 0.95, 6.0, 32), voidMat);
+      pinHole.rotation.z = Math.PI / 2;
+      pinHole.position.set(0, 3.2, 0);
+      g.add(pinHole);
+
+      return g;
+    }
+
+    let activeMesh = createFlange();
+    partRoot.add(activeMesh);
+
+    function switch3DPart(key) {
+      partRoot.remove(activeMesh);
+      if (key === 'flange') activeMesh = createFlange();
+      if (key === 'bushing') activeMesh = createBushing();
+      if (key === 'clevis') activeMesh = createClevis();
+      partRoot.add(activeMesh);
+
+      // Apply current wireframe state
+      applyWireframeState();
+
+      gsap.fromTo(partRoot.scale, { x: 0.65, y: 0.65, z: 0.65 }, { x: 1, y: 1, z: 1, duration: 0.45, ease: 'back.out(1.4)' });
+    }
+
+    // Wireframe Toggle
+    function toggleWireframe() {
+      wireframeMode = !wireframeMode;
+      document.getElementById('tool-wireframe').classList.toggle('active', wireframeMode);
+      applyWireframeState();
+    }
+
+    function applyWireframeState() {
+      titaniumMat.wireframe = wireframeMode;
+      polishedMat.wireframe = wireframeMode;
+      brassMat.wireframe = wireframeMode;
+    }
+
+    // Auto Rotate Toggle
+    let autoRotate = true;
+    function toggleAutoRotate() {
+      autoRotate = !autoRotate;
+      document.getElementById('tool-rotate').classList.toggle('active', autoRotate);
+    }
+
+    // Camera Reset
+    function reset3DCamera() {
+      gsap.to(partRoot.rotation, { x: 0.35, y: 0, z: 0, duration: 0.6, ease: 'power2.out' });
+    }
+
+    // Mouse Drag Controls
+    let isDragging = false;
+    let prevX = 0, prevY = 0;
+
+    container.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      prevX = e.clientX;
+      prevY = e.clientY;
+    });
+
+    window.addEventListener('mouseup', () => { isDragging = false; });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      const dx = e.clientX - prevX;
+      const dy = e.clientY - prevY;
+      partRoot.rotation.y += dx * 0.009;
+      partRoot.rotation.x += dy * 0.009;
+      prevX = e.clientX;
+      prevY = e.clientY;
+    });
+
+    // Render Animation Loop
+    let clock = new THREE.Clock();
+
+    function renderLoop() {
+      requestAnimationFrame(renderLoop);
+      const elapsedTime = clock.getElapsedTime();
+
+      if (!isDragging && autoRotate) {
+        partRoot.rotation.y += 0.006;
+        partRoot.rotation.x = 0.35 + Math.sin(elapsedTime * 0.8) * 0.05;
+      }
+
+      // Animate mismatch ring pulse on Part 2283
+      const ring = partRoot.getObjectByName('mismatchRing');
+      if (ring) {
+        const pulse = 1 + Math.sin(elapsedTime * 6) * 0.06;
+        ring.scale.set(pulse, pulse, pulse);
+      }
+
+      renderer.render(scene, camera);
+    }
+    renderLoop();
+
+    window.addEventListener('resize', () => {
+      camera.aspect = container.clientWidth / container.clientHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(container.clientWidth, container.clientHeight);
+    });
+
+    // Initial Trigger
+    updateSlide();
+  </script>
+</body>
+</html>
