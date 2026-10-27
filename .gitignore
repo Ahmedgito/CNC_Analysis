@@ -23,8 +23,7 @@ test-results/
 .env.*
 !.env.example
 
-# Large raw source bundles (CAD snapshots, zips); keep out of history
-docs/source_data/
+# Stray root lockfile from an accidental `npm install` at the repo root
 /package-lock.json
 
 # Editors / OS
