@@ -30,6 +30,6 @@ def ingest_drawing_bytes(
     return DrawingIngestResult(file_name, sha, drawing, key, list(drawing.warnings))
 
 
-def ingest_drawing_path(path: Path | str) -> DrawingIngestResult:
+def ingest_drawing_path(path: Path | str, max_pages: int = MAX_PAGES) -> DrawingIngestResult:
     path = Path(path)
-    return ingest_drawing_bytes(path.read_bytes(), path.name)
+    return ingest_drawing_bytes(path.read_bytes(), path.name, max_pages)

@@ -1,4 +1,4 @@
-"""Command line: ``uv run cnc ingest data/``, ``uv run cnc serve``."""
+"""Command line: ``uv run cnc ingest data/``, ``uv run cnc serve``, ``uv run cnc eval``."""
 
 from __future__ import annotations
 
@@ -57,6 +57,31 @@ def _cmd_rebuild(_: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_reset_drawing(args: argparse.Namespace) -> int:
+    """Re-extract a drawing from its file, dropping any vision reading (re-asks for consent)."""
+    from app.db.session import make_engine, make_session_factory, session_scope
+    from app.ingestion.pdf import ingest_drawing_path
+    from app.repositories.parts import replace_drawing
+
+    settings = get_settings()
+    path = Path(args.path)
+    if not path.is_file():
+        print(f"error: {path} is not a file", file=sys.stderr)
+        return 2
+    result = ingest_drawing_path(path, settings.pdf_max_pages)
+    engine = make_engine(settings.database_url)
+    try:
+        with session_scope(make_session_factory(engine)) as session:
+            part = replace_drawing(session, result.file_name, result.slice)
+    finally:
+        engine.dispose()
+    if part is None:
+        print(f"error: {result.file_name} is not an ingested drawing; run `cnc ingest` first")
+        return 1
+    print(f"reset      {result.file_name:<32} part={part} extraction={result.slice.extraction}")
+    return 0
+
+
 def _cmd_serve(args: argparse.Namespace) -> int:
     import uvicorn
 
@@ -94,6 +119,13 @@ def main(argv: list[str] | None = None) -> int:
         "rebuild", help="Regroup stored fragments into part records (after an upgrade)"
     )
     p_rebuild.set_defaults(func=_cmd_rebuild)
+
+    p_reset = sub.add_parser(
+        "reset-drawing",
+        help="Re-read a drawing from its PDF, discarding any vision reading of a scan",
+    )
+    p_reset.add_argument("path", help="The PDF file that was ingested")
+    p_reset.set_defaults(func=_cmd_reset_drawing)
 
     p_serve = sub.add_parser("serve", help="Run the API server")
     p_serve.add_argument("--host", default="127.0.0.1")

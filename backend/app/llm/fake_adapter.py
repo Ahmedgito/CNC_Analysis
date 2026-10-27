@@ -46,11 +46,12 @@ _FIELD_KEYWORDS: list[tuple[tuple[str, ...], str]] = [
     (("tool", "insert", "cutter", "drill bit"), "tool"),
     (("material", "made of", "alloy", "grade", "steel", "brass", "bronze"), "material"),
     (("stock", "raw", "blank", "billet", "bar size"), "raw_stock"),
+    # Before the diameters: "hole diameter" asks about the holes, not the part.
+    (("hole", "drilled"), "holes"),
     (("outer diameter", "outside diameter", "od", "diameter"), "outer_diameter"),
     (("bore",), "bore"),
     (("thickness", "thick"), "thickness"),
     (("finished size", "final dim", "dimension", "overall size", "size"), "finished_size"),
-    (("hole", "drilled"), "holes"),
     (("machine", "work center", "work centre", "lathe", "mill"), "machine"),
     (("cycle time", "time per piece", "time/pc", "how long"), "cycle_time"),
     (("tolerance", "tol"), "tolerance"),

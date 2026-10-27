@@ -206,6 +206,22 @@ def test_yes_reads_the_scan_and_answers_the_original_question(scan_client):
     assert any(c["provider"] == "offline-vision:vision" for c in calls)
 
 
+def test_resetting_a_read_scan_asks_for_consent_again(scan_client):
+    """``cnc reset-drawing`` re-extracts the PDF, so the vision reading is dropped."""
+    from app.db.session import session_scope
+    from app.ingestion.pdf import ingest_drawing_path
+    from app.repositories.parts import replace_drawing
+
+    first = _ask(scan_client, "3001", "What does the drawing say?")
+    _ask(scan_client, "3001", "Yes, read the scanned drawing.", first["conversation_id"])
+    fresh = ingest_drawing_path(DATA / "3001_gear_blank_scan.pdf")
+    with session_scope(scan_client.app.state.session_factory) as session:  # type: ignore[attr-defined]
+        assert replace_drawing(session, fresh.file_name, fresh.slice) == "3001"
+    drawing = scan_client.get("/api/v1/parts/3001").json()["record"]["drawings"][0]
+    assert drawing["extraction"] == "none" and drawing["facts"] == []
+    assert _ask(scan_client, "3001", "What does the drawing say?")["status"] == "needs_consent"
+
+
 def test_no_without_a_pending_offer_is_just_a_question(scan_client):
     r = _ask(scan_client, "2280", "Yes")
     assert r["status"] in ("clarify", "not_found", "answered")
