@@ -60,7 +60,8 @@ class DrawingPage(BaseModel):
     page: int
     width: float
     height: float
-    rotation: int = 0
+    rotation: int = 0  # the page's own /Rotate
+    correction: int = 0  # extra clockwise turn applied so text reads upright; the viewer uses it
     role: PageRole
     char_count: int = 0
     image_count: int = 0
@@ -75,7 +76,7 @@ class DrawingSlice(BaseModel):
     pages: list[DrawingPage]
     facts: list[DrawingFact] = Field(default_factory=list)
     part_number: str | None = None  # as printed
-    part_number_source: Literal["title_block", "filename"] | None = None
+    part_number_source: Literal["title_block", "text", "filename"] | None = None
     title: str | None = None
     current_revision: str | None = None
     units: str | None = None
