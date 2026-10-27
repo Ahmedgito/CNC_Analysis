@@ -21,7 +21,7 @@ Status key: `todo` · `doing` · `done` · `blocked` · `cut`
 | 10 | 2 | LLM: Fake, Anthropic, Groq adapters and `FailoverGateway` (retry, fallback, breaker) | done | Anthropic adapter also enables server-side refusal fallback (`fallbacks="default"`) |
 | 11 | 2 | Verifier, compute engine (safe expressions, pint units), question guard | done | Verifier also auto-links uncited values and flags ungrounded numbers |
 | 12 | 2 | `POST /parts/{pn}/ask` JSON + SSE, conversations, `llm_call` logging | done | One re-ask when every citation fails verification |
-| 13 | 2 | Golden set + eval runner, real-provider runs, prompt fixes | blocked | 42-question set + `cnc eval` done; offline baseline 37/42 in `docs/eval/offline-rules.md`. Real runs need API keys |
+| 13 | 2 | Golden set + eval runner, real-provider runs, prompt fixes | done | Claude (via Claude Code) 42/42, Groq 41/42, offline 37/42; three issues found and fixed (Unicode hyphen, double unit conversion, banner revision) |
 | 14 | 3 | Frontend scaffold: Next 16, Tailwind 4, TanStack Query, Zod, API client | done | shadcn dropped: user asked for Tailwind utilities only, no plain CSS |
 | 15 | 3 | Part picker page and record viewer with sheet tabs | done | |
 | 16 | 3 | Chat panel: SSE client, answer card, source chips with cell highlight, provider footer | done | Verified live in Chrome: stages stream, chips highlight cells, panels scroll independently |

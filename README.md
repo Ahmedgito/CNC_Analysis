@@ -135,15 +135,25 @@ The web app reads `BACKEND_URL` (default `http://127.0.0.1:8000`) in its proxy r
 content, citation recall and precision, abstention and wrong answers, and writes a report to
 `docs/eval/`.
 
-| Provider | Passed | Answerable correct | Correct abstentions | Citation recall / precision |
-|---|---|---|---|---|
-| Offline rules (baseline, no LLM) | 37 / 42 | 24 / 29 | 13 / 13 | 86% / 89% |
-| Anthropic `claude-opus-5-5` | pending API key | | | |
-| Groq `gpt-oss-120b` | pending API key | | | |
+| Provider | Passed | Answerable correct | Correct abstentions | Wrong answers | Citation recall / precision | Median latency |
+|---|---|---|---|---|---|---|
+| Claude `claude-opus-5-5` (via Claude Code, internal testing) | 42 / 42 | 29 / 29 | 13 / 13 | 0 | 100% / 92% | 7.7 s |
+| Groq `openai/gpt-oss-120b` (fallback) | 41 / 42 | 29 / 29 | 12 / 13 | 1 | 100% / 100% | 1.4 s |
+| Offline rules (baseline, no LLM) | 37 / 42 | 24 / 29 | 13 / 13 | 5 | 86% / 91% | under 0.1 s |
 
-Full per-question results: [docs/eval/offline-rules.md](docs/eval/offline-rules.md). The baseline
-is a keyword engine, so its misses (for example reading "lot size" as "size") show the harness can
-tell right answers from wrong ones.
+Every citation shown in every run was verified against the file; none that failed verification
+was ever displayed. Per-question reports: [Claude](docs/eval/claude-code.md),
+[Groq](docs/eval/groq.md), [offline baseline](docs/eval/offline-rules.md).
+
+What the runs taught us, all now fixed and covered by tests:
+
+- Groq wrote `6061‑T6` with a non-breaking hyphen; matching now folds Unicode dash variants.
+- Groq converted mm to inches twice (`c1 / 25.4` plus a unit conversion); the compute engine now
+  rejects a conversion factor in the expression and the pipeline re-asks once.
+- Groq's one wrong answer (N06) read the job-card register's "Revision 3" banner as the drawing
+  revision. The prompt now says banner text describes the spreadsheet, not the part; spot checks
+  after the fix return "not in the files" for the drawing and still answer the register's revision.
+  The table above reports the run as recorded, before that fix.
 
 ## Quality
 
