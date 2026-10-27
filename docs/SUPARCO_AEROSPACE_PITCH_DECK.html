@@ -184,23 +184,7 @@
       gap: 14px;
     }
 
-    .timer-pill {
-      font-family: var(--font-mono);
-      font-size: 0.78rem;
-      color: var(--text-muted);
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid var(--card-border);
-      padding: 6px 14px;
-      border-radius: 6px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
 
-    .timer-pill strong {
-      color: #ffffff;
-      font-weight: 700;
-    }
 
     .nav-btn {
       background: rgba(255, 255, 255, 0.06);
@@ -640,11 +624,7 @@
     </div>
 
     <div class="header-pills">
-      <div class="timer-pill">
-        <i class="fa-regular fa-clock" style="color: var(--cyan);"></i>
-        <span>ELAPSED:</span>
-        <strong id="deck-timer">00:00</strong>
-      </div>
+
 
       <button class="nav-btn" id="laser-btn" onclick="toggleLaser()" title="Shortcut: Press 'L'">
         <i class="fa-solid fa-bullseye"></i> <span>Laser Pointer (L)</span>
@@ -882,16 +862,7 @@
 
   <!-- Script Engine -->
   <script>
-    // ---------------------------------------------------------
-    // 1. Presentation Stopwatch
-    // ---------------------------------------------------------
-    let elapsedSeconds = 0;
-    setInterval(() => {
-      elapsedSeconds++;
-      const m = String(Math.floor(elapsedSeconds / 60)).padStart(2, '0');
-      const s = String(elapsedSeconds % 60).padStart(2, '0');
-      document.getElementById('deck-timer').textContent = `${m}:${s}`;
-    }, 1000);
+
 
     // ---------------------------------------------------------
     // 2. Deck Navigation & Jump Dots
